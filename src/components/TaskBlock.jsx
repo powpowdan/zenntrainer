@@ -24,7 +24,7 @@ export default function TaskBlock({ task, onDelete, highlight, onEdit }) {
         padding: "0 8px",
         color: "#fff",
         cursor: "grab",
-        fontSize: highlight ? "18px" : "14px",
+        fontSize: highlight ? "19px" : "16px",
         userSelect: "none",
         transition: "background-color 0.3s", // smooth color change
       }}
@@ -37,7 +37,7 @@ export default function TaskBlock({ task, onDelete, highlight, onEdit }) {
           <input
             value={planText}
             onChange={(e) => setPlanText(e.target.value)}
-            style={{ flex: 1, fontSize: "12px" }}
+            style={{ flex: 1, fontSize: "16px" }}
           />
           <button onClick={savePlan} style={{ fontSize: "12px" }}>Save</button>
         </div>
