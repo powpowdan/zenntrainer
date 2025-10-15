@@ -1,9 +1,12 @@
 import TaskBlock from "./TaskBlock";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
+import { useState } from "react";
 
 
 export default function Timeline({ tasks, setTasks, onDelete, elapsedTime }) {
   const PIXELS_PER_MINUTE = 6; // must match TaskBlock
+  const [isOverTrash, setIsOverTrash] = useState(false);
+   const [isDragging, setIsDragging] = useState(false);
   const totalDuration = tasks.reduce((sum, t) => sum + t.duration, 0);
 
   // Total timeline height in px
@@ -22,14 +25,26 @@ export default function Timeline({ tasks, setTasks, onDelete, elapsedTime }) {
   });
 
   // Handle drag & drop reordering
-  const handleDragEnd = (result) => {
+ const handleDragEnd = (result) => {
+     setIsDragging(false);
     if (!result.destination) return;
+
+    // Check if dropped in trash zone
+    if (result.destination.droppableId === "trash") {
+      const taskId = tasks[result.source.index].id;
+      onDelete(taskId);
+      setIsOverTrash(false);
+      return;
+    }
 
     const newTasks = Array.from(tasks);
     const [movedTask] = newTasks.splice(result.source.index, 1);
     newTasks.splice(result.destination.index, 0, movedTask);
-
     setTasks(newTasks);
+  };
+
+    const handleDragStart = () => {
+    setIsDragging(true);
   };
 
   const handleEditPlan = (taskId, newPlan) => {
@@ -39,7 +54,7 @@ export default function Timeline({ tasks, setTasks, onDelete, elapsedTime }) {
 };
 
   return (
-    <DragDropContext onDragEnd={handleDragEnd}>
+    <DragDropContext  onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <Droppable droppableId="timeline">
         {(provided) => (
           <div
@@ -91,6 +106,36 @@ export default function Timeline({ tasks, setTasks, onDelete, elapsedTime }) {
               </Draggable>
             ))}
 
+            {provided.placeholder}
+          </div>
+        )}
+      </Droppable>
+           {/* Floating Trash Zone */}
+      <Droppable droppableId="trash">
+        {(provided, snapshot) => (
+          <div
+            ref={provided.innerRef}
+            {...provided.droppableProps}
+            style={{
+              position: "fixed",
+              bottom: "0",
+              left: "0",
+              width: "100%",
+              height: "70px",
+              backgroundColor: snapshot.isDraggingOver
+                ? "#ff4444"
+                : "rgba(30,30,30,0.9)",
+              color: "white",
+              textAlign: "center",
+              lineHeight: "70px",
+              fontSize: "16px",
+              zIndex: 1000,
+              opacity: isDragging ? 1 : 0,
+              pointerEvents: isDragging ? "auto" : "none",
+              transition: "opacity 0.4s ease, background-color 0.3s ease",
+            }}
+          >
+            🗑️ Drop Here to Delete
             {provided.placeholder}
           </div>
         )}

@@ -50,21 +50,7 @@ export default function TaskBlock({ task, onDelete, highlight, onEdit }) {
         </div>
       )}
 
-        <button
-        onClick={() => onDelete(task.id)}
-        style={{
-          flexShrink: 0,
-          background: "rgba(255,255,255,0.3)",
-          border: "none",
-          color: "#fff",
-          cursor: "pointer",
-          padding: "2px 6px",
-          borderRadius: "3px",
-          fontSize: "12px",
-        }}
-      >
-        X
-      </button>
+        
     </div>
   );
 }
