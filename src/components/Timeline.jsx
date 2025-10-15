@@ -10,19 +10,25 @@ export default function Timeline({ tasks, setTasks, onDelete, elapsedTime }) {
   const totalDuration = tasks.reduce((sum, t) => sum + t.duration, 0);
 
   // Total timeline height in px
-  const timelineHeight = tasks.reduce((sum, t) => sum + t.duration * PIXELS_PER_MINUTE, 0);
+  const timelineHeight = totalDuration * PIXELS_PER_MINUTE;
 
   // Vertical position of progress line
-  const progressPercent = Math.min(elapsedTime / totalDuration, 1);
+  const progressPercent = totalDuration ? Math.min(elapsedTime / totalDuration, 1) : 0;
   const progressPx = timelineHeight * progressPercent;
 
-  // Determine which task is currently active
-  let cumulativeTime = 0;
-  const tasksWithHighlight = tasks.map((task) => {
-    cumulativeTime += task.duration;
-    const isActive = elapsedTime <= cumulativeTime && elapsedTime > cumulativeTime - task.duration;
-    return { ...task, isActive };
-  });
+  // Determine which task is visually active based on progress line
+let cumulativePx = 0;
+const tasksWithHighlight = tasks.map((task) => {
+  const taskHeight = task.duration * PIXELS_PER_MINUTE;
+  const startPx = cumulativePx;
+  const endPx = cumulativePx + taskHeight;
+  cumulativePx = endPx;
+
+  // Active only when the progress line has *entered* this block
+  const isActive = progressPx > startPx && progressPx <= endPx;
+
+  return { ...task, isActive };
+});
 
   // Handle drag & drop reordering
  const handleDragEnd = (result) => {
@@ -76,7 +82,7 @@ export default function Timeline({ tasks, setTasks, onDelete, elapsedTime }) {
                 width: "100%",
                 height: "3px",
                 backgroundColor: "white",
-                transition: "top 0.5s linear",
+                transition: "top 0.1s linear", //usually 0.5
                 zIndex: 10,
               }}
             />
@@ -98,6 +104,7 @@ export default function Timeline({ tasks, setTasks, onDelete, elapsedTime }) {
                       borderRadius: "5px",
                       marginBottom: "2px",
                       touchAction: "none",
+                      
                     }}
                   >
                     <TaskBlock task={task} onDelete={onDelete} highlight={task.isActive}  onEdit={handleEditPlan} />
