@@ -65,9 +65,9 @@ const handleDragEnd = (result) => {
             ref={provided.innerRef}
             style={{
               position: "relative",
-              width: "100%",
-              height: "100%",
-              overflowY: "auto", 
+      width: "100%",
+      height: "100%",
+      overflowY: "auto", 
             }}
           >
             {/* Horizontal progress line */}
@@ -100,7 +100,7 @@ const handleDragEnd = (result) => {
                         : "none",
                       borderRadius: "5px",
                       marginBottom: "2px",
-                      touchAction: "none",
+                      touchAction: "pan-y",
                       
                     }}
                   >
