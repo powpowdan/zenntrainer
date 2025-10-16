@@ -4,8 +4,7 @@ import { useState } from "react";
 
 
 export default function Timeline({ tasks, setTasks, onDelete, elapsedTime }) {
-  const PIXELS_PER_MINUTE = 6; // must match TaskBlock
-  const [isOverTrash, setIsOverTrash] = useState(false);
+  const PIXELS_PER_MINUTE = 6; // must match TaskBlock 
    const [isDragging, setIsDragging] = useState(false);
   const totalDuration = tasks.reduce((sum, t) => sum + t.duration, 0);
 
@@ -31,23 +30,21 @@ const tasksWithHighlight = tasks.map((task) => {
 });
 
   // Handle drag & drop reordering
- const handleDragEnd = (result) => {
-     setIsDragging(false);
-    if (!result.destination) return;
+const handleDragEnd = (result) => {
+  setIsDragging(false);
+  if (!result.destination) return;
 
-    // Check if dropped in trash zone
-    if (result.destination.droppableId === "trash") {
-      const taskId = tasks[result.source.index].id;
-      onDelete(taskId);
-      setIsOverTrash(false);
-      return;
-    }
+  if (result.destination.droppableId === "trash") {
+    const taskId = tasks[result.source.index].id;
+    onDelete(taskId);
+    return;
+  }
 
-    const newTasks = Array.from(tasks);
-    const [movedTask] = newTasks.splice(result.source.index, 1);
-    newTasks.splice(result.destination.index, 0, movedTask);
-    setTasks(newTasks);
-  };
+  const newTasks = Array.from(tasks);
+  const [movedTask] = newTasks.splice(result.source.index, 1);
+  newTasks.splice(result.destination.index, 0, movedTask);
+  setTasks(newTasks);
+};
 
     const handleDragStart = () => {
     setIsDragging(true);
@@ -62,7 +59,7 @@ const tasksWithHighlight = tasks.map((task) => {
   return (
     <DragDropContext  onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <Droppable droppableId="timeline">
-        {(provided) => (
+        {(provided) => ( 
           <div
             {...provided.droppableProps}
             ref={provided.innerRef}
@@ -70,7 +67,7 @@ const tasksWithHighlight = tasks.map((task) => {
               position: "relative",
               width: "100%",
               height: "100%",
-              overflowY: "auto",
+              overflowY: "auto", 
             }}
           >
             {/* Horizontal progress line */}
@@ -127,22 +124,23 @@ const tasksWithHighlight = tasks.map((task) => {
               position: "fixed",
               bottom: "0",
               left: "0",
-              width: "100%",
-              height: "70px",
+              width: "100%", 
               backgroundColor: snapshot.isDraggingOver
-                ? "#ff4444"
-                : "rgba(30,30,30,0.9)",
+                ? "#ff0000ff"
+                : "rgba(187, 32, 32, 0.9)",
               color: "white",
-              textAlign: "center",
-              lineHeight: "70px",
-              fontSize: "16px",
+              paddingTop: "10px",  
+                paddingBottom: "10px",
+                height: "auto", 
+              textAlign: "center", 
+              fontSize: "20px",
               zIndex: 1000,
               opacity: isDragging ? 1 : 0,
-              pointerEvents: isDragging ? "auto" : "none",
+             pointerEvents: isDragging ? "auto" : "none",
               transition: "opacity 0.4s ease, background-color 0.3s ease",
             }}
           >
-            🗑️ Drop Here to Delete
+            🗑️ Drop Below Here to Delete
             {provided.placeholder}
           </div>
         )}

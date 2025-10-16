@@ -68,11 +68,12 @@ useEffect(() => {
       <Header   onStart={startClass}
   onPause={pauseClass}
   onReset={resetClass} />
-      <div style={{ flex: 1, width: "100%", overflow: "hidden" }}>
+      <div style={{ flex: 1, width: "100%", minHeight: 0,    WebkitOverflowScrolling: "touch",  }}>
         <Timeline tasks={tasks} setTasks={setTasks} onDelete={deleteTask} elapsedTime={elapsedTime} />
       </div>
       <div style={{ flex: "0 0 auto", padding: "5px" }}>
         <AddTaskForm onAdd={addTask} />
+        
       </div>
     </div>
   );
