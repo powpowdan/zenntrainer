@@ -116,35 +116,37 @@ const handleDragEnd = (result) => {
       </Droppable>
            {/* Floating Trash Zone */}
       <Droppable droppableId="trash">
-        {(provided, snapshot) => (
-          <div
-            ref={provided.innerRef}
-            {...provided.droppableProps}
-            style={{
-              position: "fixed",
-              bottom: "0",
-              left: "0",
-              width: "100%", 
-              backgroundColor: snapshot.isDraggingOver
-                ? "#ff0000ff"
-                : "rgba(187, 32, 32, 0.9)",
-              color: "white",
-              paddingTop: "10px",  
-                paddingBottom: "10px",
-                height: "auto", 
-              textAlign: "center", 
-              fontSize: "20px",
-              zIndex: 1000,
-              opacity: isDragging ? 1 : 0,
-             pointerEvents: isDragging ? "auto" : "none",
-              transition: "opacity 0.4s ease, background-color 0.3s ease",
-            }}
-          >
-            🗑️ Drop Below Here to Delete
-            {provided.placeholder}
-          </div>
-        )}
-      </Droppable>
+  {(provided, snapshot) => (
+    <div
+      ref={provided.innerRef}
+      {...provided.droppableProps}
+      style={{
+        position: "fixed",
+        bottom: 0,
+        left: 0,
+        width: "100%",
+        height: "auto",
+        padding: 10,
+        backgroundColor: snapshot.isDraggingOver
+          ? "#ff4444"
+          : "rgba(187, 32, 32, 0.9)",
+        color: "white",
+        textAlign: "center",
+        fontSize: "20px",
+        zIndex: 1000,
+        opacity: isDragging ? 1 : 0,
+        pointerEvents: isDragging ? "auto" : "none",
+        transition: "opacity 0.4s ease, background-color 0.3s ease, transform 0.2s ease",
+        transform: snapshot.isDraggingOver ? "scale(1.05)" : "scale(1)",
+        boxShadow: snapshot.isDraggingOver ? "0 0 10px rgba(255,255,255,0.7)" : "none",
+        
+      }}
+    >
+      🗑️ Drag below here to Delete
+      {provided.placeholder}
+    </div>
+  )}
+</Droppable>
     </DragDropContext>
   );
 }
