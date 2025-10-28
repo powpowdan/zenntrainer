@@ -1,4 +1,4 @@
-export default function Header({ onStart, onPause, onReset }) {
+export default function Header({ onStart, onPause, onReset, onSave, onLoad, onClear }) {
  
   return (
     <div
@@ -18,6 +18,11 @@ export default function Header({ onStart, onPause, onReset }) {
         <button onClick={onReset} style={{ padding: "5px 10px", fontSize: "14px",}}>
           Reset
         </button>
+          <div style={{ marginTop: "5px"}} >
+        <button onClick={onSave} style={{ padding: "5px 10px", fontSize: "14px",  margin: "0 10px 0 0",}}>💾 Save</button>
+        <button onClick={onLoad} style={{ padding: "5px 10px", fontSize: "14px", margin: "0 10px 0 10px",}}>📂 Load</button>
+        <button onClick={onClear} style={{ padding: "5px 10px", fontSize: "14px",}}>🗑️ Clear</button>
+      </div>
     </div>
   );
 }

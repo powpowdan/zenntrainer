@@ -10,87 +10,63 @@ export default function App() {
 
   const [selectedTask, setSelectedTask] = useState(null);
 
-  const [tasks, setTasks] = useState([
-    {
-      id: 1,
-      name: "Warmup",
-      duration: 20,
-      color: "#4caf50",
-      plan: "5-7 min skip ropes. run, pushups",
-    },
-    {
-      id: 2,
-      name: "Stretch",
-      duration: 10,
-      color: "#2196f3",
-      plan: "7 point stretch, focus on shoulder more this class",
-    },
-    {
-      id: 3,
-      name: "Technical",
-      duration: 10,
-      color: "#ff9800",
-      plan: "Phase 1: teep / jab/ cross, tiger step, jab / cross /knee \nPhase 2: jab/ cross, step aside, jab, body kick",
-    },
-    {
-      id: 4,
-      name: "Cardio",
-      duration: 10,
-      color: "#f44336",
-      plan: "run and then sprints on side and pushups",
-    },
-    {
-      id: 5,
-      name: "Heavy bag",
-      duration: 10,
-      color: "#9c27b0",
-      plan: "Same as technical, add low kick. ",
-    },
-    {
-      id: 6,
-      name: "Warmup2",
-      duration: 8,
-      color: "#4caf50",
-      plan: "Teep teep teep teep asdd",
-    },
-    {
-      id: 7,
-      name: "Stretch2",
-      duration: 10,
-      color: "#2196f3",
-      plan: "heavy bag burnout kicks",
-    },
-    {
-      id: 8,
-      name: "Technical2",
-      duration: 5,
-      color: "#ff9800",
-      plan: "Jab, Cross, Thai Kick",
-    },
-    { id: 9, name: "Cardio2", duration: 4, color: "#f44336", plan: "" },
-    {
-      id: 10,
-      name: "Cooldown2",
-      duration: 5,
-      color: "#9c27b0",
-      plan: "int stretch, clean equi",
-    },
-    {
-      id: 11,
-      name: "Technical",
-      duration: 10,
-      color: "#ff9800",
-      plan: "Jab, Cross, Thai Kick",
-    },
-    { id: 12, name: "Cardio", duration: 5, color: "#f44336", plan: "" },
-    {
-      id: 14,
-      name: "Cooldown",
-      duration: 5,
-      color: "#9c27b0",
-      plan: "Jab, Cross, Thai Kick",
-    },
-  ]);
+  const [tasks, setTasks] = useState(() => {
+    const saved = localStorage.getItem("savedClass");
+    return saved
+      ? JSON.parse(saved)
+      : [
+          {
+            id: 1,
+            name: "Warmup",
+            duration: 20,
+            color: "#4caf50",
+            plan: "5-7 min skip ropes. run, pushups",
+          },
+          {
+            id: 2,
+            name: "Stretch",
+            duration: 10,
+            color: "#2196f3",
+            plan: "7 point stretch, focus on shoulder more this class",
+          },
+          {
+            id: 3,
+            name: "Technical",
+            duration: 10,
+            color: "#ff9800",
+            plan: "Phase 1: teep / jab/ cross, tiger step, jab / cross /knee \nPhase 2: jab/ cross, step aside, jab, body kick",
+          },
+          {
+            id: 4,
+            name: "Cardio",
+            duration: 10,
+            color: "#f44336",
+            plan: "run and then sprints on side and pushups",
+          },
+          {
+            id: 5,
+            name: "Heavy bag",
+            duration: 10,
+            color: "#9c27b0",
+            plan: "Same as technical, add low kick. ",
+          },
+          {
+            id: 6,
+            name: "Warmup2",
+            duration: 8,
+            color: "#4caf50",
+            plan: "Teep teep teep teep asdd",
+          },
+          {
+            id: 7,
+            name: "Stretch2",
+            duration: 10,
+            color: "#2196f3",
+            plan: "heavy bag burnout kicks",
+          },
+         
+        ];
+  });
   const updateTaskPlan = (id, newPlan) => {
     setTasks((prevTasks) =>
       prevTasks.map((t) => (t.id === id ? { ...t, plan: newPlan } : t))
@@ -146,6 +122,12 @@ export default function App() {
     return () => clearInterval(interval);
   }, [isRunning, tasks]);
 
+  // this is for auto saving on moving an task
+
+  //   useEffect(() => {
+  //   localStorage.setItem("savedClass", JSON.stringify(tasks));
+  // }, [tasks]);
+
   return (
     <div
       style={{
@@ -158,7 +140,38 @@ export default function App() {
         boxSizing: "border-box",
       }}
     >
-      <Header onStart={startClass} onPause={pauseClass} onReset={resetClass} />
+      {/* <button
+        onClick={() =>
+          localStorage.setItem("savedClass", JSON.stringify(tasks))
+        }
+      >
+        Save Class
+      </button>
+
+      <button
+        onClick={() => {
+          const saved = localStorage.getItem("savedClass");
+          if (saved) setTasks(JSON.parse(saved));
+        }}
+      >
+        Load Saved Class
+      </button>
+
+      <button onClick={() => localStorage.removeItem("savedClass")}>
+        Clear Saved
+      </button> */}
+
+      <Header
+        onStart={startClass}
+        onPause={pauseClass}
+        onReset={resetClass}
+        onSave={() => localStorage.setItem("savedClass", JSON.stringify(tasks))}
+        onLoad={() => {
+          const saved = localStorage.getItem("savedClass");
+          if (saved) setTasks(JSON.parse(saved));
+        }}
+        onClear={() => localStorage.removeItem("savedClass")}
+      />
       <div
         style={{
           flex: 1,
