@@ -113,7 +113,7 @@ export default function App() {
           if (prev + 1 >= tasks.reduce((sum, t) => sum + t.duration, 0)) {
             // reset when class ends
             resetClass();
-            return prev + 1;
+            return 0;
           }
           return prev + 1;
         });
@@ -171,6 +171,8 @@ export default function App() {
           if (saved) setTasks(JSON.parse(saved));
         }}
         onClear={() => localStorage.removeItem("savedClass")}
+          isRunning={isRunning}
+  setIsRunning={setIsRunning}
       />
       <div
         style={{

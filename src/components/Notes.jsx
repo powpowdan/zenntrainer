@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-
+import Button from "@mui/material/Button";
+import TextField from "@mui/material/TextField";
 export default function Notes({ task, onUpdatePlan }) {
   const [text, setText] = useState(task?.plan || "");
 
@@ -29,37 +30,59 @@ export default function Notes({ task, onUpdatePlan }) {
       </h2>
 
       {/* <p>{task.plan}</p> */}
-      <textarea
+   <TextField
         value={text}
         onChange={(e) => setText(e.target.value)}
         placeholder="Add session notes, drills, or steps..."
-        style={{
-          width: "100%",
-          minHeight: "150px",
-          resize: "vertical",
-          borderRadius: "8px",
-          border: "1px solid #575757ff",
-          padding: "10px",
-          fontSize: "15px",
-          lineHeight: "1.5",
+        multiline
+        minRows={6}
+        maxRows={12}
+        fullWidth
+        variant="outlined"
+        sx={{
+          borderRadius: 2,
+          backgroundColor: "#1e1e1e",
+          "& .MuiOutlinedInput-root": {
+            borderRadius: 2,
+            fontSize: "15px",
+            lineHeight: 1.5,
+            padding: "10px",
+            color: "#fff",
+            "& fieldset": {
+              borderColor: task?.color || "#575757",
+            },
+            "&:hover fieldset": {
+              borderColor: task?.color || "#90caf9",
+            },
+            "&.Mui-focused fieldset": {
+              borderColor: task?.color || "#90caf9",
+              boxShadow: `0 0 5px ${task?.color || "#90caf9"}55`,
+            },
+          },
+          "& .MuiInputBase-input": {
+            color: "#fff",
+          },
         }}
       />
 
-      <button
-        onClick={handleSave}
-        style={{
-          marginTop: "10px",
-          backgroundColor: task.color,
-          color: "#fff",
-          border: "none",
-          borderRadius: "6px",
-          padding: "6px 12px",
-          cursor: "pointer",
-          fontWeight: "600",
-        }}
-      >
-        Save Plan
-      </button>
+   <Button
+  size="small"
+  variant="outlined"
+  onClick={handleSave}
+  sx={{
+    mt: 1, // margin-top
+    borderColor: task.color,
+    color: task.color,
+    borderRadius: 1, // 6px
+    fontWeight: 600,
+    "&:hover": {
+      borderColor: task.color,
+      backgroundColor: `${task.color}22`, // subtle hover
+    },
+  }}
+>
+  Save Notes
+</Button>
     </div>
   );
 }
