@@ -4,6 +4,11 @@ import Timeline from "./components/Timeline";
 import AddTaskForm from "./components/AddTaskForm";
 import Notes from "./components/Notes";
 
+const COLOR_PALETTE = ["#22c55e", "#38bdf8", "#f97316", "#f97373", "#a855f7"];
+
+const getRandomColor = () =>
+  COLOR_PALETTE[Math.floor(Math.random() * COLOR_PALETTE.length)];
+
 export default function App() {
   const [isRunning, setIsRunning] = useState(false);
   const [elapsedTime, setElapsedTime] = useState(0);
@@ -84,7 +89,11 @@ export default function App() {
   const addTask = (task) => {
     setTasks([
       ...tasks,
-      { ...task, id: Date.now(), color: task.color || "#333" },
+      {
+        ...task,
+        id: Date.now(),
+        color: task.color || getRandomColor(),
+      },
     ]);
   };
 
