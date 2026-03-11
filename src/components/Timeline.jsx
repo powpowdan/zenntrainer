@@ -76,6 +76,11 @@ export default function Timeline({
               width: "100%",
               height: "100%",
               overflowY: "auto",
+              background:
+                "radial-gradient(circle at top, rgba(37, 99, 235, 0.12), transparent 55%), var(--bg-surface)",
+              padding: "8px 10px",
+              borderRadius: "16px 16px 0 0",
+              borderTop: "1px solid var(--border-subtle)",
             }}
           >
             {/* Horizontal progress line */}
@@ -85,9 +90,11 @@ export default function Timeline({
                 top: progressPx,
                 left: 0,
                 width: "100%",
-                height: "1px",
-                backgroundColor: "white",
-                transition: "top 0.1s linear", //usually 0.5
+                height: "2px",
+                background:
+                  "linear-gradient(90deg, transparent, var(--accent-primary), transparent)",
+                boxShadow: "0 0 10px rgba(59,130,246,0.4)",
+                transition: "top 0.12s linear",
                 zIndex: 10,
               }}
             />
@@ -111,10 +118,10 @@ export default function Timeline({
                         ...provided.draggableProps.style,
                         width: "100%",
                         boxShadow: snapshot.isDragging
-                          ? "0 4px 12px rgba(0,0,0,0.2)"
-                          : "none",
-                        borderRadius: "5px",
-                        marginBottom: "2px",
+                          ? "0 10px 30px rgba(15,23,42,0.9)"
+                          : "0 1px 4px rgba(0,0,0,0.45)",
+                        borderRadius: "12px",
+                        marginBottom: "6px",
                         touchAction: "pan-y",
                       }}
                     >
@@ -150,11 +157,11 @@ export default function Timeline({
               height: "auto",
               padding: 10,
               backgroundColor: snapshot.isDraggingOver
-                ? "#ff4444"
-                : "rgba(187, 32, 32, 0.9)",
-              color: "white",
+                ? "rgba(248, 113, 113, 0.95)"
+                : "rgba(31, 41, 55, 0.96)",
+              color: "var(--text-primary)",
               textAlign: "center",
-              fontSize: "20px",
+              fontSize: 16,
               zIndex: 1000,
               opacity: isDragging ? 1 : 0,
               pointerEvents: isDragging ? "auto" : "none",
@@ -162,11 +169,11 @@ export default function Timeline({
                 "opacity 0.4s ease, background-color 0.3s ease, transform 0.2s ease",
               transform: snapshot.isDraggingOver ? "scale(1.05)" : "scale(1)",
               boxShadow: snapshot.isDraggingOver
-                ? "0 0 10px rgba(255,255,255,0.7)"
-                : "none",
+                ? "0 0 18px rgba(248,113,113,0.75)"
+                : "0 -6px 20px rgba(0,0,0,0.7)",
             }}
           >
-            🗑️ Drag below here to Delete
+            🗑 Drag here to delete
             {provided.placeholder}
           </div>
         )}

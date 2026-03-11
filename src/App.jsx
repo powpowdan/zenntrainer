@@ -19,49 +19,49 @@ export default function App() {
             id: 1,
             name: "Warmup",
             duration: 20,
-            color: "#4caf50",
+            color: "#22c55e",
             plan: "5-7 min skip ropes. run, pushups",
           },
           {
             id: 2,
             name: "Stretch",
             duration: 10,
-            color: "#2196f3",
+            color: "#38bdf8",
             plan: "7 point stretch, focus on shoulder more this class",
           },
           {
             id: 3,
             name: "Technical",
             duration: 10,
-            color: "#ff9800",
+            color: "#f97316",
             plan: "Phase 1: teep / jab/ cross, tiger step, jab / cross /knee \nPhase 2: jab/ cross, step aside, jab, body kick",
           },
           {
             id: 4,
             name: "Cardio",
             duration: 10,
-            color: "#f44336",
+            color: "#f97373",
             plan: "run and then sprints on side and pushups",
           },
           {
             id: 5,
             name: "Heavy bag",
             duration: 10,
-            color: "#9c27b0",
+            color: "#a855f7",
             plan: "Same as technical, add low kick. ",
           },
           {
             id: 6,
             name: "Warmup2",
             duration: 8,
-            color: "#4caf50",
+            color: "#22c55e",
             plan: "Teep teep teep teep asdd",
           },
           {
             id: 7,
             name: "Stretch2",
             duration: 10,
-            color: "#2196f3",
+            color: "#38bdf8",
             plan: "heavy bag burnout kicks",
           },
          
@@ -138,6 +138,8 @@ export default function App() {
         padding: "0",
         margin: "0",
         boxSizing: "border-box",
+        backgroundColor: "var(--bg-app)",
+        color: "var(--text-primary)",
       }}
     >
       {/* <button
@@ -180,26 +182,46 @@ export default function App() {
           width: "100%",
           minHeight: 0,
           WebkitOverflowScrolling: "touch",
+          display: "flex",
+          flexDirection: "column",
+          gap: 8,
+          padding: "8px 10px 10px",
+          boxSizing: "border-box",
         }}
       >
-        <Timeline
-          tasks={tasks}
-          setTasks={setTasks}
-          onDelete={deleteTask}
-          elapsedTime={elapsedTime}
-          onSelectTask={setSelectedTask}
-          selectedTask={selectedTask}
-        />
-      </div>
-      <div style={{ flex: "0 0 33%", padding: "10px" }}>
-        <Notes
-          task={isRunning ? activeTask : selectedTask || activeTask || null}
-          onUpdatePlan={updateTaskPlan}
-        />
-      </div>
-
-      <div style={{ flex: "0 0 auto", padding: "5px" }}>
-        <AddTaskForm onAdd={addTask} />
+        <div
+          style={{
+            flex: 1,
+            minHeight: 0,
+          }}
+        >
+          <Timeline
+            tasks={tasks}
+            setTasks={setTasks}
+            onDelete={deleteTask}
+            elapsedTime={elapsedTime}
+            onSelectTask={setSelectedTask}
+            selectedTask={selectedTask}
+          />
+        </div>
+        <div
+          style={{
+            flex: "0 0 auto",
+          }}
+        >
+          <Notes
+            task={isRunning ? activeTask : selectedTask || activeTask || null}
+            onUpdatePlan={updateTaskPlan}
+          />
+        </div>
+        <div
+          style={{
+            flex: "0 0 auto",
+            paddingTop: 4,
+          }}
+        >
+          <AddTaskForm onAdd={addTask} />
+        </div>
       </div>
     </div>
   );

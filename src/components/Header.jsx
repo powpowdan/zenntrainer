@@ -1,11 +1,11 @@
-import React, { useState } from "react";
+import React from "react";
 import {
   Button,
   Stack,
   Typography,
   AppBar,
   Toolbar,
-  SpeedDial, 
+  SpeedDial,
   SpeedDialAction,
   SpeedDialIcon,
 } from "@mui/material";
@@ -14,10 +14,18 @@ import FolderOpenIcon from "@mui/icons-material/FolderOpen";
 import DeleteIcon from "@mui/icons-material/Delete";
 import MenuIcon from "@mui/icons-material/Menu";
 import CloseIcon from "@mui/icons-material/Close";
-export default function Header({ onStart, onPause, onReset, onSave, onLoad, onClear, isRunning,
-  setIsRunning, }) {
- 
-    const [open, setOpen] = React.useState(false);
+
+export default function Header({
+  onStart,
+  onPause,
+  onReset,
+  onSave,
+  onLoad,
+  onClear,
+  isRunning,
+  setIsRunning,
+}) {
+  const [open, setOpen] = React.useState(false);
 
   const handleToggle = () => {
     if (isRunning) {
@@ -28,36 +36,97 @@ export default function Header({ onStart, onPause, onReset, onSave, onLoad, onCl
     setIsRunning(!isRunning);
   };
 
-   const actions = [
+  const actions = [
     { icon: <SaveIcon />, name: "Save", onClick: onSave },
     { icon: <FolderOpenIcon />, name: "Load", onClick: onLoad },
     { icon: <DeleteIcon />, name: "Clear", onClick: onClear },
   ];
 
   return (
-    <AppBar position="static" sx={{ backgroundColor: "#2b2a33", paddingY: 1 }}>
-      <Toolbar sx={{ flexDirection: "column", alignItems: "center" }}>
-        <Typography variant="h6" sx={{ mb: 1 }}>
-          Zenn Class Tracker
-        </Typography>
+    <AppBar
+      position="static"
+      elevation={0}
+      sx={{
+        backgroundColor: "rgba(5, 6, 10, 0.95)",
+        borderBottom: "1px solid var(--border-subtle)",
+        backdropFilter: "blur(12px)",
+      }}
+    >
+      <Toolbar
+        sx={{
+          width: "100%",
+          maxWidth: 960,
+          mx: "auto",
+          py: 1,
+          display: "flex",
+          flexDirection: { xs: "column", sm: "row" },
+          alignItems: { xs: "flex-start", sm: "center" },
+          justifyContent: "space-between",
+          gap: 1,
+        }}
+      >
+        <div>
+          <Typography
+            variant="h6"
+            sx={{
+              fontSize: 18,
+              fontWeight: 600,
+              letterSpacing: 0.4,
+            }}
+          >
+            Zenn Class Tracker
+          </Typography>
+          <Typography
+            variant="body2"
+            sx={{ color: "var(--text-muted)", fontSize: 12 }}
+          >
+            Plan and run Muay Thai sessions
+          </Typography>
+        </div>
 
         <Stack direction="row" spacing={1} alignItems="center">
           <Button
             variant="contained"
-            color={isRunning ? "warning" : "success"}
             onClick={handleToggle}
+            sx={{
+              borderRadius: 999,
+              px: 2.5,
+              py: 0.75,
+              fontWeight: 600,
+              textTransform: "none",
+              fontSize: 14,
+              backgroundColor: isRunning
+                ? "#f97316"
+                : "var(--accent-success)",
+              "&:hover": {
+                backgroundColor: isRunning ? "#ea580c" : "#16a34a",
+              },
+            }}
           >
             {isRunning ? "Pause" : "Start"}
           </Button>
 
-          <Button variant="outlined" color="info" onClick={onReset}>
+          <Button
+            variant="outlined"
+            onClick={onReset}
+            sx={{
+              borderRadius: 999,
+              textTransform: "none",
+              fontSize: 13,
+              borderColor: "var(--border-subtle)",
+              color: "var(--text-secondary)",
+              "&:hover": {
+                borderColor: "var(--accent-primary)",
+                backgroundColor: "rgba(15,23,42,0.6)",
+              },
+            }}
+          >
             Reset
           </Button>
 
-      
           <SpeedDial
             ariaLabel="Save actions"
-              icon={
+            icon={
               <SpeedDialIcon
                 icon={<MenuIcon />}
                 openIcon={<CloseIcon />}
@@ -70,10 +139,11 @@ export default function Header({ onStart, onPause, onReset, onSave, onLoad, onCl
             FabProps={{
               size: "small",
               sx: {
-                bgcolor: "#1976d2",
-                "&:hover": { bgcolor: "#1565c0" },
+                bgcolor: "#111827",
+                color: "var(--text-secondary)",
+                "&:hover": { bgcolor: "#020617" },
                 boxShadow: "none",
-                ml: 1,
+                ml: 0.5,
               },
             }}
           >
