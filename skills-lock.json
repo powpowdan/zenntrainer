@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "skills": {
+    "prompt-engineer": {
+      "source": "davila7/claude-code-templates",
+      "sourceType": "github",
+      "computedHash": "8fdaa14384b7a83271e1a03bf0828627dd78525aa3c65ccb2566519623ad96ae"
+    }
+  }
+}

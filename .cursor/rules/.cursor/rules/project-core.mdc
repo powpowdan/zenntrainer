@@ -1,0 +1,12 @@
+---
+description: General standards for the Exercise Timer React app
+globs: "**/*.{js,jsx}"
+alwaysApply: true
+---
+# Project Standards
+
+- **Context**: This is a React-based exercise class timer for instructors to create blocks for their class.
+- **Goal**: Help users build exercise "blocks" that count down sequentially.
+- **Tech Stack**: React (Functional Components), LocalStorage so for saving data.
+- **Styling**: Use inline styles for now. Keep the layout responsive (100vh/100vw).
+- **Naming**: Use camelCase for functions and variables.
