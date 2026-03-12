@@ -3,6 +3,8 @@ import Header from "./components/Header";
 import Timeline from "./components/Timeline";
 import AddTaskForm from "./components/AddTaskForm";
 import Notes from "./components/Notes";
+import Login from "./Login";
+import { supabase } from "./supabaseClient";
 
 const COLOR_PALETTE = ["#22c55e", "#38bdf8", "#f97316", "#f97373", "#a855f7"];
 
@@ -10,6 +12,8 @@ const getRandomColor = () =>
   COLOR_PALETTE[Math.floor(Math.random() * COLOR_PALETTE.length)];
 
 export default function App() {
+  const [session, setSession] = useState(null);
+  const [guestMode, setGuestMode] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
   const [elapsedTime, setElapsedTime] = useState(0);
 
@@ -72,11 +76,67 @@ export default function App() {
          
         ];
   });
-  const updateTaskPlan = (id, newPlan) => {
-    setTasks((prevTasks) =>
-      prevTasks.map((t) => (t.id === id ? { ...t, plan: newPlan } : t))
-    );
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      // If we have a session, we are definitely not in guest mode anymore
+      if (session) setGuestMode(false);
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      if (session) setGuestMode(false);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // Fetch tasks from DB when session is available
+  useEffect(() => {
+    if (session) {
+      fetchTasks();
+    }
+  }, [session]);
+
+  // Save to LocalStorage if Guest Mode
+  useEffect(() => {
+    if (!session) {
+      localStorage.setItem("savedClass", JSON.stringify(tasks));
+    }
+  }, [tasks, session]);
+
+  const fetchTasks = async () => {
+    const { data, error } = await supabase
+      .from("tasks")
+      .select("*")
+      .order("id", { ascending: true });
+    if (error) console.error("Error fetching tasks:", error);
+    else setTasks(data);
   };
+
+  const updateTaskPlan = async (id, newPlan) => {
+    // Optimistic update
+    const oldTasks = [...tasks];
+    setTasks((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, plan: newPlan } : t))
+    );
+
+    if (session) {
+      const { error } = await supabase
+        .from("tasks")
+        .update({ plan: newPlan })
+        .eq("id", id);
+
+      if (error) {
+        console.error("Error updating task:", error);
+        setTasks(oldTasks); // Rollback
+      }
+    }
+  };
+
   // Determine which task is active based on elapsedTime
   let cumulativeTime = 0;
   const activeTask = tasks.find((task) => {
@@ -86,19 +146,50 @@ export default function App() {
     return elapsedTime >= startTime && elapsedTime < endTime;
   });
 
-  const addTask = (task) => {
-    setTasks([
-      ...tasks,
-      {
+  const addTask = async (task) => {
+    if (session) {
+      const newTask = {
         ...task,
-        id: Date.now(),
+        user_id: session.user.id,
         color: task.color || getRandomColor(),
-      },
-    ]);
+      };
+
+      // Insert into DB
+      const { data, error } = await supabase
+        .from("tasks")
+        .insert([newTask])
+        .select();
+
+      if (error) {
+        console.error("Error adding task:", error);
+      } else {
+        setTasks([...tasks, ...data]);
+      }
+    } else {
+      // Guest mode: Local state + LocalStorage (handled by useEffect)
+      setTasks([
+        ...tasks,
+        {
+          ...task,
+          id: Date.now(),
+          color: task.color || getRandomColor(),
+        },
+      ]);
+    }
   };
 
-  const deleteTask = (id) => {
+  const deleteTask = async (id) => {
+    // Optimistic delete
+    const oldTasks = [...tasks];
     setTasks(tasks.filter((t) => t.id !== id));
+
+    if (session) {
+      const { error } = await supabase.from("tasks").delete().eq("id", id);
+      if (error) {
+        console.error("Error deleting task", error);
+        setTasks(oldTasks);
+      }
+    }
   };
 
   const startClass = () => {
@@ -131,11 +222,9 @@ export default function App() {
     return () => clearInterval(interval);
   }, [isRunning, tasks]);
 
-  // this is for auto saving on moving an task
-
-  //   useEffect(() => {
-  //   localStorage.setItem("savedClass", JSON.stringify(tasks));
-  // }, [tasks]);
+  if (!session && !guestMode) {
+    return <Login onGuest={() => setGuestMode(true)} />;
+  }
 
   return (
     <div
@@ -151,37 +240,24 @@ export default function App() {
         color: "var(--text-primary)",
       }}
     >
-      {/* <button
-        onClick={() =>
-          localStorage.setItem("savedClass", JSON.stringify(tasks))
-        }
-      >
-        Save Class
-      </button>
-
-      <button
-        onClick={() => {
-          const saved = localStorage.getItem("savedClass");
-          if (saved) setTasks(JSON.parse(saved));
-        }}
-      >
-        Load Saved Class
-      </button>
-
-      <button onClick={() => localStorage.removeItem("savedClass")}>
-        Clear Saved
-      </button> */}
+     
 
       <Header
         onStart={startClass}
         onPause={pauseClass}
         onReset={resetClass}
-        onSave={() => localStorage.setItem("savedClass", JSON.stringify(tasks))}
-        onLoad={() => {
-          const saved = localStorage.getItem("savedClass");
-          if (saved) setTasks(JSON.parse(saved));
+        onSave={() => {
+          if (!session) localStorage.setItem("savedClass", JSON.stringify(tasks));
+          alert(session ? "Auto-saved to cloud!" : "Manual save complete!");
         }}
-        onClear={() => localStorage.removeItem("savedClass")}
+        onLoad={session ? fetchTasks : () => {
+           const saved = localStorage.getItem("savedClass");
+           if (saved) setTasks(JSON.parse(saved));
+        }}
+        onClear={() => {
+           if (session) supabase.auth.signOut();
+           else setGuestMode(false); // Return to login screen
+        }} 
           isRunning={isRunning}
   setIsRunning={setIsRunning}
       />
