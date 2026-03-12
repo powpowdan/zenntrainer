@@ -102,11 +102,11 @@ export default function App() {
   }, [session]);
 
   // Save to LocalStorage if Guest Mode
-  useEffect(() => {
-    if (!session) {
-      localStorage.setItem("savedClass", JSON.stringify(tasks));
-    }
-  }, [tasks, session]);
+  // useEffect(() => {
+  //   if (!session) {
+  //     localStorage.setItem("savedClass", JSON.stringify(tasks));
+  //   }
+  // }, [tasks, session]);
 
   const fetchTasks = async () => {
     const { data, error } = await supabase
