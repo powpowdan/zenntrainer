@@ -5,22 +5,50 @@ export default function AddTaskForm({ onAdd }) {
   const [name, setName] = useState("");
   const [duration, setDuration] = useState("");
   const [color, setColor] = useState("");
+  const [plan, setPlan] = useState("");
+  const [error, setError] = useState("");
 
   const palette = ["#22c55e", "#38bdf8", "#f97316", "#f97373", "#a855f7"];
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    onAdd({ name, duration: Number(duration), color });
+  const resetForm = () => {
     setName("");
     setDuration("");
     setColor("");
-    setIsOpen(false); // hide form after adding
+    setPlan("");
+    setError("");
+    setIsOpen(false);
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    const trimmedName = name.trim();
+    const numericDuration = Number(duration);
+
+    if (!trimmedName) {
+      setError("Give this block a name.");
+      return;
+    }
+
+    if (!Number.isFinite(numericDuration) || numericDuration <= 0) {
+      setError("Duration must be greater than 0 minutes.");
+      return;
+    }
+
+    onAdd({
+      name: trimmedName,
+      duration: numericDuration,
+      color,
+      plan: plan.trim(),
+    });
+    resetForm();
   };
 
   if (!isOpen) {
     return (
       <button
         onClick={() => setIsOpen(true)}
+        type="button"
+        className="add-task-trigger"
         style={{
           width: "100%",
           padding: "10px 14px",
@@ -34,14 +62,15 @@ export default function AddTaskForm({ onAdd }) {
           letterSpacing: 0.4,
         }}
       >
-        ➕ Add Task
+        Add block
       </button>
     );
   }
 
   return (
-    <div
-      style={{
+      <div
+        role="presentation"
+        style={{
         position: "fixed",
         inset: 0,
         zIndex: 40,
@@ -52,7 +81,7 @@ export default function AddTaskForm({ onAdd }) {
     >
       {/* Scrim */}
       <div
-        onClick={() => setIsOpen(false)}
+        onClick={resetForm}
         style={{
           position: "absolute",
           inset: 0,
@@ -63,6 +92,7 @@ export default function AddTaskForm({ onAdd }) {
       {/* Bottom sheet / modal card */}
       <form
         onSubmit={handleSubmit}
+        aria-labelledby="add-task-title"
         style={{
           position: "relative",
           width: "100%",
@@ -92,11 +122,12 @@ export default function AddTaskForm({ onAdd }) {
               color: "var(--text-primary)",
             }}
           >
-            Add task
+            <span id="add-task-title">Add block</span>
           </h3>
           <button
             type="button"
-            onClick={() => setIsOpen(false)}
+            onClick={resetForm}
+            aria-label="Close add block form"
             style={{
               background: "transparent",
               border: "none",
@@ -118,11 +149,13 @@ export default function AddTaskForm({ onAdd }) {
             gap: 8,
           }}
         >
-          <input
-            placeholder="Task name"
+          <label className="form-field">
+            <span>Block name</span>
+            <input
+            placeholder="e.g. Warmup"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            required
+            aria-invalid={Boolean(error && !name.trim())}
             style={{
               padding: "8px",
               borderRadius: "6px",
@@ -130,15 +163,19 @@ export default function AddTaskForm({ onAdd }) {
               backgroundColor: "#020617",
               color: "var(--text-primary)",
             }}
-          />
+            />
+          </label>
 
-          <input
+          <label className="form-field">
+            <span>Duration</span>
+            <input
             type="number"
-            placeholder="Duration (min)"
+            placeholder="Minutes"
             value={duration}
             onChange={(e) => setDuration(e.target.value)}
             min={1}
-            required
+            step="any"
+            aria-invalid={Boolean(error && (!duration || Number(duration) <= 0))}
             style={{
               padding: "8px",
               borderRadius: "6px",
@@ -146,7 +183,18 @@ export default function AddTaskForm({ onAdd }) {
               backgroundColor: "#020617",
               color: "var(--text-primary)",
             }}
-          />
+            />
+          </label>
+
+          <label className="form-field">
+            <span>Coaching notes <em>Optional</em></span>
+            <textarea
+              value={plan}
+              onChange={(e) => setPlan(e.target.value)}
+              placeholder="Drills, cues, or progressions..."
+              rows={3}
+            />
+          </label>
 
           <div style={{ marginTop: 2 }}>
             <div
@@ -156,7 +204,7 @@ export default function AddTaskForm({ onAdd }) {
                 marginBottom: 4,
               }}
             >
-              Pick a color (optional)
+              Pick a color <em>Optional</em>
             </div>
             <div
               style={{
@@ -170,6 +218,8 @@ export default function AddTaskForm({ onAdd }) {
                   key={c}
                   type="button"
                   onClick={() => setColor(c)}
+                  aria-label={`Choose ${c} block color`}
+                  aria-pressed={color === c}
                   style={{
                     width: 30,
                     height: 30,
@@ -186,6 +236,8 @@ export default function AddTaskForm({ onAdd }) {
             </div>
           </div>
         </div>
+
+        {error ? <p className="form-error" role="alert">{error}</p> : null}
 
         <div
           style={{
@@ -208,11 +260,11 @@ export default function AddTaskForm({ onAdd }) {
               fontWeight: 600,
             }}
           >
-            Add task
+            Add block
           </button>
           <button
             type="button"
-            onClick={() => setIsOpen(false)}
+            onClick={resetForm}
             style={{
               background: "#111827",
               color: "var(--text-secondary)",

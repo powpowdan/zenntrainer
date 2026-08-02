@@ -1,125 +1,135 @@
-import { useState, useEffect } from "react";
-import Button from "@mui/material/Button";
-import TextField from "@mui/material/TextField";
-export default function Notes({ task, onUpdatePlan }) {
-  const [text, setText] = useState(task?.plan || "");
+import { useEffect, useState } from "react";
 
-  // whenever a new task is selected, update local text
+const PALETTE = ["#22c55e", "#38bdf8", "#f97316", "#f97373", "#a855f7"];
+
+export default function Notes({ task, onUpdateTask, onDeleteTask }) {
+  const [name, setName] = useState(task?.name || "");
+  const [duration, setDuration] = useState(task?.duration || "");
+  const [color, setColor] = useState(task?.color || "");
+  const [text, setText] = useState(task?.plan || "");
+  const [error, setError] = useState("");
+
   useEffect(() => {
+    setName(task?.name || "");
+    setDuration(task?.duration || "");
+    setColor(task?.color || "");
     setText(task?.plan || "");
+    setError("");
   }, [task]);
 
   if (!task) {
     return (
-      <div
-        style={{
-          textAlign: "center",
-          padding: "16px",
-          opacity: 0.7,
-          color: "var(--text-secondary)",
-          fontSize: 14,
-        }}
-      >
-        <p>Select a block on the timeline to view or add notes.</p>
+      <div className="block-editor block-editor-empty">
+        <p>Select a block on the timeline to edit its details.</p>
       </div>
     );
   }
 
-  const handleSave = () => {
-    onUpdatePlan(task.id, text);
+  const handleSubmit = (event) => {
+    event.preventDefault();
+    const trimmedName = name.trim();
+    const numericDuration = Number(duration);
+
+    if (!trimmedName) {
+      setError("Give this block a name.");
+      return;
+    }
+
+    if (!Number.isFinite(numericDuration) || numericDuration <= 0) {
+      setError("Duration must be greater than 0 minutes.");
+      return;
+    }
+
+    onUpdateTask(task.id, {
+      name: trimmedName,
+      duration: numericDuration,
+      color: color || task.color,
+      plan: text.trim(),
+    });
+    setError("");
+  };
+
+  const resetDraft = () => {
+    setName(task.name || "");
+    setDuration(task.duration || "");
+    setColor(task.color || "");
+    setText(task.plan || "");
+    setError("");
   };
 
   return (
-    <div
-      style={{
-        textAlign: "left",
-        padding: 12,
-        borderTop: "1px solid var(--border-subtle)",
-        background:
-          "radial-gradient(circle at top, rgba(34,197,94,0.14), transparent 60%), var(--bg-surface-alt)",
-        borderRadius: "16px 16px 0 0",
-        height: "100%",
-        boxSizing: "border-box",
-      }}
-    >
-      <h2
-        style={{
-          color: task.color || "var(--accent-primary)",
-          fontSize: 16,
-          margin: "0 0 6px",
-        }}
-      >
-        <strong>{task.name}</strong>{" "}
-        <span
-          style={{
-            fontSize: 12,
-            color: "var(--text-muted)",
-            textTransform: "uppercase",
-            letterSpacing: 0.6,
-          }}
+    <form className="block-editor" onSubmit={handleSubmit}>
+      <div className="block-editor-heading">
+        <div>
+          <span className="editor-kicker">Selected block</span>
+          <h2>{task.name}</h2>
+        </div>
+        <span className="editor-duration">{task.duration} min</span>
+      </div>
+
+      <label className="form-field">
+        <span>Block name</span>
+        <input value={name} onChange={(event) => setName(event.target.value)} />
+      </label>
+
+      <label className="form-field">
+        <span>Duration</span>
+        <input
+          type="number"
+          min={1}
+          step="any"
+          value={duration}
+          onChange={(event) => setDuration(event.target.value)}
+          aria-invalid={Boolean(error && (!duration || Number(duration) <= 0))}
+        />
+      </label>
+
+      <label className="form-field">
+        <span>Coaching notes</span>
+        <textarea
+          value={text}
+          onChange={(event) => setText(event.target.value)}
+          placeholder="Drills, cues, or progressions..."
+          rows={7}
+        />
+      </label>
+
+      <fieldset className="color-field">
+        <legend>Block color</legend>
+        <div className="color-options">
+          {PALETTE.map((paletteColor) => (
+            <button
+              key={paletteColor}
+              type="button"
+              className="color-option"
+              style={{ backgroundColor: paletteColor }}
+              onClick={() => setColor(paletteColor)}
+              aria-label={`Choose ${paletteColor} block color`}
+              aria-pressed={color === paletteColor}
+            />
+          ))}
+        </div>
+      </fieldset>
+
+      {error ? <p className="form-error" role="alert">{error}</p> : null}
+
+      <div className="block-editor-actions">
+        <button className="editor-save-button" type="submit">Save block</button>
+        <button
+          className="editor-cancel-button"
+          type="button"
+          onClick={resetDraft}
         >
-          {task.duration} minutes
-        </span>
-      </h2>
-
-      <TextField
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        placeholder="Add session notes, drills, or steps..."
-        multiline
-        minRows={6}
-        maxRows={12}
-        fullWidth
-        variant="outlined"
-        sx={{
-          borderRadius: 2,
-          backgroundColor: "#020617",
-          "& .MuiOutlinedInput-root": {
-            borderRadius: 2,
-            fontSize: "15px",
-            lineHeight: 1.5,
-            padding: "10px",
-            color: "#e5e7eb",
-            "& fieldset": {
-              borderColor: task?.color || "var(--border-subtle)",
-            },
-            "&:hover fieldset": {
-              borderColor: task?.color || "var(--accent-primary)",
-            },
-            "&.Mui-focused fieldset": {
-              borderColor: task?.color || "var(--accent-primary)",
-              boxShadow: `0 0 6px ${
-                task?.color || "rgba(59,130,246,0.7)"
-              }55`,
-            },
-          },
-          "& .MuiInputBase-input": {
-            color: "#e5e7eb",
-          },
-        }}
-      />
-
-      <Button
-        size="small"
-        variant="outlined"
-        onClick={handleSave}
-        sx={{
-          mt: 1.2,
-          borderColor: task.color || "var(--accent-primary)",
-          color: task.color || "var(--accent-primary)",
-          borderRadius: 999,
-          fontWeight: 600,
-          textTransform: "none",
-          fontSize: 13,
-          px: 2.4,
-          "&:hover": {
-            borderColor: task.color || "var(--accent-primary)",
-            backgroundColor: `${task.color || "#3b82f6"}22`,
-          },
-        }}
-      >
-        Save notes
-      </Button>
-    </div>
+          Cancel changes
+        </button>
+        <button
+          className="editor-delete-button"
+          type="button"
+          onClick={() => onDeleteTask(task.id)}
+        >
+          Delete block
+        </button>
+      </div>
+    </form>
   );
 }

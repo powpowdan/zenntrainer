@@ -167,23 +167,10 @@ export default function App() {
     else setTasks(data);
   };
 
-  const updateTaskPlan = async (id, newPlan) => {
-    const oldTasks = [...tasks];
+  const updateTask = (id, updates) => {
     setTasks((prev) =>
-      prev.map((task) => (task.id === id ? { ...task, plan: newPlan } : task))
+      prev.map((task) => (task.id === id ? { ...task, ...updates } : task))
     );
-
-    if (session) {
-      const { error } = await supabase
-        .from("tasks")
-        .update({ plan: newPlan })
-        .eq("id", id);
-
-      if (error) {
-        console.error("Error updating task:", error);
-        setTasks(oldTasks);
-      }
-    }
   };
 
   const addTask = async (task) => {
@@ -203,6 +190,9 @@ export default function App() {
   };
 
   const deleteTask = async (id) => {
+    const task = tasks.find((item) => item.id === id);
+    if (task && !window.confirm(`Delete “${task.name}”?`)) return;
+
     const oldTasks = [...tasks];
     setTasks(tasks.filter((task) => task.id !== id));
 
@@ -342,7 +332,8 @@ export default function App() {
         <div className="builder-notes">
           <Notes
             task={isRunning ? activeTask : selectedTask || activeTask || null}
-            onUpdatePlan={updateTaskPlan}
+            onUpdateTask={updateTask}
+            onDeleteTask={deleteTask}
           />
         </div>
         <div className="builder-add-task">
