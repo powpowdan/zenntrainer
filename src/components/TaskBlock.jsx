@@ -1,24 +1,12 @@
-import { useState } from "react";
-
 export default function TaskBlock({
   task,
-  onDelete,
   highlight,
-  onEdit,
   onSelect,
   selected,
 }) {
   const PIXELS_PER_MINUTE = 6;
 
   const isActive = highlight || selected;
-
-  const [editingPlan, setEditingPlan] = useState(false);
-  const [planText, setPlanText] = useState(task.plan || "");
-
-  const savePlan = () => {
-    onEdit(task.id, planText);
-    setEditingPlan(false);
-  };
 
   const accent = task.color || "var(--accent-primary)";
 

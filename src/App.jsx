@@ -1,8 +1,9 @@
-import { useState, useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import Header from "./components/Header";
 import Timeline from "./components/Timeline";
 import AddTaskForm from "./components/AddTaskForm";
 import Notes from "./components/Notes";
+import LiveClass from "./components/LiveClass";
 import Login from "./Login";
 import { supabase } from "./supabaseClient";
 
@@ -11,102 +12,139 @@ const COLOR_PALETTE = ["#22c55e", "#38bdf8", "#f97316", "#f97373", "#a855f7"];
 const getRandomColor = () =>
   COLOR_PALETTE[Math.floor(Math.random() * COLOR_PALETTE.length)];
 
+const getDuration = (task) => Number(task.duration) || 0;
+
 export default function App() {
   const [session, setSession] = useState(null);
   const [guestMode, setGuestMode] = useState(false);
+  const [isLiveMode, setIsLiveMode] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
+  const [isComplete, setIsComplete] = useState(false);
   const [elapsedTime, setElapsedTime] = useState(0);
-
+  const [baseElapsed, setBaseElapsed] = useState(0);
+  const [runStartedAt, setRunStartedAt] = useState(null);
+  const [transitionTask, setTransitionTask] = useState(null);
   const [selectedTask, setSelectedTask] = useState(null);
+  const transitionTimer = useRef(null);
+  const previousActiveIndex = useRef(null);
+  const suppressTransition = useRef(false);
 
   const [tasks, setTasks] = useState(() => {
     const saved = localStorage.getItem("savedClass");
     return saved
       ? JSON.parse(saved)
       : [
-          {
-            id: 1,
-            name: "Warmup",
-            duration: 20,
-            color: "#22c55e",
-            plan: "5-7 min skip ropes. run, pushups",
-          },
-          {
-            id: 2,
-            name: "Stretch",
-            duration: 10,
-            color: "#38bdf8",
-            plan: "7 point stretch, focus on shoulder more this class",
-          },
-          {
-            id: 3,
-            name: "Technical",
-            duration: 10,
-            color: "#f97316",
-            plan: "Phase 1: teep / jab/ cross, tiger step, jab / cross /knee \nPhase 2: jab/ cross, step aside, jab, body kick",
-          },
-          {
-            id: 4,
-            name: "Cardio",
-            duration: 10,
-            color: "#f97373",
-            plan: "run and then sprints on side and pushups",
-          },
-          {
-            id: 5,
-            name: "Heavy bag",
-            duration: 10,
-            color: "#a855f7",
-            plan: "Same as technical, add low kick. ",
-          },
-          {
-            id: 6,
-            name: "Warmup2",
-            duration: 8,
-            color: "#22c55e",
-            plan: "Teep teep teep teep asdd",
-          },
-          {
-            id: 7,
-            name: "Stretch2",
-            duration: 10,
-            color: "#38bdf8",
-            plan: "heavy bag burnout kicks",
-          },
-         
+          { id: 1, name: "Warmup", duration: 20, color: "#22c55e", plan: "5-7 min skip ropes. run, pushups" },
+          { id: 2, name: "Stretch", duration: 10, color: "#38bdf8", plan: "7 point stretch, focus on shoulder more this class" },
+          { id: 3, name: "Technical", duration: 10, color: "#f97316", plan: "Phase 1: teep / jab/ cross, tiger step, jab / cross /knee \nPhase 2: jab/ cross, step aside, jab, body kick" },
+          { id: 4, name: "Cardio", duration: 10, color: "#f97373", plan: "run and then sprints on side and pushups" },
+          { id: 5, name: "Heavy bag", duration: 10, color: "#a855f7", plan: "Same as technical, add low kick. " },
+          { id: 6, name: "Warmup2", duration: 8, color: "#22c55e", plan: "Teep teep teep teep asdd" },
+          { id: 7, name: "Stretch2", duration: 10, color: "#38bdf8", plan: "heavy bag burnout kicks" },
         ];
   });
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      // If we have a session, we are definitely not in guest mode anymore
-      if (session) setGuestMode(false);
+    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
+      setSession(currentSession);
+      if (currentSession) setGuestMode(false);
     });
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      if (session) setGuestMode(false);
+    } = supabase.auth.onAuthStateChange((_event, currentSession) => {
+      setSession(currentSession);
+      if (currentSession) setGuestMode(false);
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
-  // Fetch tasks from DB when session is available
   useEffect(() => {
-    if (session) {
-      fetchTasks();
-    }
+    if (session) fetchTasks();
   }, [session]);
 
-  // Save to LocalStorage if Guest Mode
-  // useEffect(() => {
-  //   if (!session) {
-  //     localStorage.setItem("savedClass", JSON.stringify(tasks));
-  //   }
-  // }, [tasks, session]);
+  const totalDuration = tasks.reduce(
+    (sum, task) => sum + getDuration(task) * 60,
+    0
+  );
+
+  const getCurrentElapsed = () => {
+    if (!isRunning || !runStartedAt) return elapsedTime;
+    return Math.min(
+      totalDuration,
+      baseElapsed + (Date.now() - runStartedAt) / 1000
+    );
+  };
+
+  useEffect(() => {
+    if (!isRunning || !runStartedAt) return undefined;
+
+    const updateClock = () => {
+      const nextElapsed = Math.min(
+        totalDuration,
+        baseElapsed + (Date.now() - runStartedAt) / 1000
+      );
+      setElapsedTime(nextElapsed);
+
+      if (nextElapsed >= totalDuration) {
+        setElapsedTime(totalDuration);
+        setBaseElapsed(totalDuration);
+        setRunStartedAt(null);
+        setIsRunning(false);
+        setIsComplete(true);
+      }
+    };
+
+    updateClock();
+    const interval = window.setInterval(updateClock, 100);
+    return () => window.clearInterval(interval);
+  }, [baseElapsed, isRunning, runStartedAt, totalDuration]);
+
+  const activeIndex = (() => {
+    let elapsed = 0;
+    return tasks.findIndex((task) => {
+      const end = elapsed + getDuration(task) * 60;
+      const matches = elapsedTime >= elapsed && elapsedTime < end;
+      elapsed = end;
+      return matches;
+    });
+  })();
+
+  const activeTask = activeIndex >= 0 ? tasks[activeIndex] : null;
+
+  useEffect(() => {
+    if (activeIndex < 0) {
+      previousActiveIndex.current = activeIndex;
+      return undefined;
+    }
+
+    const previousIndex = previousActiveIndex.current;
+    if (
+      previousIndex !== null &&
+      activeIndex > previousIndex &&
+      isRunning &&
+      !suppressTransition.current
+    ) {
+      setTransitionTask(tasks[activeIndex]);
+      window.clearTimeout(transitionTimer.current);
+      transitionTimer.current = window.setTimeout(() => {
+        setTransitionTask(null);
+      }, 1800);
+    }
+
+    suppressTransition.current = false;
+    previousActiveIndex.current = activeIndex;
+
+    return () => window.clearTimeout(transitionTimer.current);
+  }, [activeIndex, isRunning, tasks]);
+
+  useEffect(() => {
+    if (elapsedTime > totalDuration) {
+      setElapsedTime(totalDuration);
+      setBaseElapsed(totalDuration);
+    }
+  }, [elapsedTime, totalDuration]);
 
   const fetchTasks = async () => {
     const { data, error } = await supabase
@@ -118,10 +156,9 @@ export default function App() {
   };
 
   const updateTaskPlan = async (id, newPlan) => {
-    // Optimistic update
     const oldTasks = [...tasks];
     setTasks((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, plan: newPlan } : t))
+      prev.map((task) => (task.id === id ? { ...task, plan: newPlan } : task))
     );
 
     if (session) {
@@ -132,56 +169,30 @@ export default function App() {
 
       if (error) {
         console.error("Error updating task:", error);
-        setTasks(oldTasks); // Rollback
+        setTasks(oldTasks);
       }
     }
   };
 
-  // Determine which task is active based on elapsedTime
-  let cumulativeTime = 0;
-  const activeTask = tasks.find((task) => {
-    const startTime = cumulativeTime;
-    const endTime = cumulativeTime + task.duration;
-    cumulativeTime = endTime;
-    return elapsedTime >= startTime && elapsedTime < endTime;
-  });
-
   const addTask = async (task) => {
+    const taskWithColor = { ...task, color: task.color || getRandomColor() };
     if (session) {
-      const newTask = {
-        ...task,
-        user_id: session.user.id,
-        color: task.color || getRandomColor(),
-      };
-
-      // Insert into DB
+      const newTask = { ...taskWithColor, user_id: session.user.id };
       const { data, error } = await supabase
         .from("tasks")
         .insert([newTask])
         .select();
 
-      if (error) {
-        console.error("Error adding task:", error);
-      } else {
-        setTasks([...tasks, ...data]);
-      }
+      if (error) console.error("Error adding task:", error);
+      else setTasks((prev) => [...prev, ...data]);
     } else {
-      // Guest mode: Local state + LocalStorage (handled by useEffect)
-      setTasks([
-        ...tasks,
-        {
-          ...task,
-          id: Date.now(),
-          color: task.color || getRandomColor(),
-        },
-      ]);
+      setTasks((prev) => [...prev, { ...taskWithColor, id: Date.now() }]);
     }
   };
 
   const deleteTask = async (id) => {
-    // Optimistic delete
     const oldTasks = [...tasks];
-    setTasks(tasks.filter((t) => t.id !== id));
+    setTasks(tasks.filter((task) => task.id !== id));
 
     if (session) {
       const { error } = await supabase.from("tasks").delete().eq("id", id);
@@ -193,55 +204,95 @@ export default function App() {
   };
 
   const startClass = () => {
+    if (!tasks.length || totalDuration <= 0) return;
+    const startAt = isComplete || elapsedTime >= totalDuration ? 0 : elapsedTime;
+    setElapsedTime(startAt);
+    setBaseElapsed(startAt);
+    setIsComplete(false);
+    setIsLiveMode(true);
     setIsRunning(true);
+    setRunStartedAt(Date.now());
+    previousActiveIndex.current = startAt === 0 ? 0 : activeIndex;
   };
 
   const pauseClass = () => {
+    if (!isRunning) return;
+    const currentElapsed = getCurrentElapsed();
+    setElapsedTime(currentElapsed);
+    setBaseElapsed(currentElapsed);
+    setRunStartedAt(null);
     setIsRunning(false);
+  };
+
+  const resumeClass = () => {
+    if (isComplete || !tasks.length || totalDuration <= 0) return;
+    setBaseElapsed(elapsedTime);
+    setRunStartedAt(Date.now());
+    setIsRunning(true);
   };
 
   const resetClass = () => {
     setIsRunning(false);
+    setRunStartedAt(null);
     setElapsedTime(0);
+    setBaseElapsed(0);
+    setIsComplete(false);
+    setTransitionTask(null);
+    previousActiveIndex.current = 0;
   };
 
-  useEffect(() => {
-    let interval;
-    if (isRunning) {
-      interval = setInterval(() => {
-        setElapsedTime((prev) => {
-          if (prev + 1 >= tasks.reduce((sum, t) => sum + t.duration, 0)) {
-            // reset when class ends
-            resetClass();
-            return 0;
-          }
-          return prev + 1;
-        });
-      }, 100); // 60000 for an hour here
-    }
-    return () => clearInterval(interval);
-  }, [isRunning, tasks]);
+  const moveToBlock = (targetIndex) => {
+    if (targetIndex < 0 || targetIndex >= tasks.length) return;
+
+    const targetElapsed = tasks
+      .slice(0, targetIndex)
+      .reduce((sum, task) => sum + getDuration(task) * 60, 0);
+    suppressTransition.current = true;
+    setTransitionTask(null);
+    setElapsedTime(targetElapsed);
+    setBaseElapsed(targetElapsed);
+    setIsComplete(false);
+    previousActiveIndex.current = targetIndex;
+    if (isRunning) setRunStartedAt(Date.now());
+  };
+
+  const moveNext = () => moveToBlock(activeIndex + 1);
+  const movePrevious = () => moveToBlock(activeIndex - 1);
+
+  const exitLiveMode = () => {
+    setIsRunning(false);
+    setRunStartedAt(null);
+    setIsLiveMode(false);
+    setTransitionTask(null);
+  };
 
   if (!session && !guestMode) {
     return <Login onGuest={() => setGuestMode(true)} />;
   }
 
-  return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        height: "100vh",
-        width: "100vw",
-        padding: "0",
-        margin: "0",
-        boxSizing: "border-box",
-        backgroundColor: "var(--bg-app)",
-        color: "var(--text-primary)",
-      }}
-    >
-     
+  if (isLiveMode) {
+    return (
+      <LiveClass
+        tasks={tasks}
+        activeTask={activeTask}
+        activeIndex={activeIndex}
+        elapsedTime={elapsedTime}
+        totalDuration={totalDuration}
+        isRunning={isRunning}
+        isComplete={isComplete}
+        transitionTask={transitionTask}
+        onPause={pauseClass}
+        onResume={resumeClass}
+        onReset={resetClass}
+        onPrevious={movePrevious}
+        onNext={moveNext}
+        onExit={exitLiveMode}
+      />
+    );
+  }
 
+  return (
+    <div className="app-shell">
       <Header
         onStart={startClass}
         onPause={pauseClass}
@@ -250,61 +301,36 @@ export default function App() {
           if (!session) localStorage.setItem("savedClass", JSON.stringify(tasks));
           alert(session ? "Auto-saved to cloud!" : "Manual save complete!");
         }}
-        onLoad={session ? fetchTasks : () => {
-           const saved = localStorage.getItem("savedClass");
-           if (saved) setTasks(JSON.parse(saved));
-        }}
+        onLoad={session
+          ? fetchTasks
+          : () => {
+              const saved = localStorage.getItem("savedClass");
+              if (saved) setTasks(JSON.parse(saved));
+            }}
         onClear={() => {
-           if (session) supabase.auth.signOut();
-           else setGuestMode(false); // Return to login screen
-        }} 
-          isRunning={isRunning}
-  setIsRunning={setIsRunning}
-      />
-      <div
-        style={{
-          flex: 1,
-          width: "100%",
-          minHeight: 0,
-          WebkitOverflowScrolling: "touch",
-          display: "flex",
-          flexDirection: "column",
-          gap: 8,
-          padding: "8px 10px 10px",
-          boxSizing: "border-box",
+          if (session) supabase.auth.signOut();
+          else setGuestMode(false);
         }}
-      >
-        <div
-          style={{
-            flex: 1,
-            minHeight: 0,
-          }}
-        >
+        isRunning={isRunning}
+      />
+      <div className="builder-content">
+        <div className="builder-timeline">
           <Timeline
             tasks={tasks}
             setTasks={setTasks}
             onDelete={deleteTask}
-            elapsedTime={elapsedTime}
+            elapsedTime={elapsedTime / 60}
             onSelectTask={setSelectedTask}
             selectedTask={selectedTask}
           />
         </div>
-        <div
-          style={{
-            flex: "0 0 auto",
-          }}
-        >
+        <div className="builder-notes">
           <Notes
             task={isRunning ? activeTask : selectedTask || activeTask || null}
             onUpdatePlan={updateTaskPlan}
           />
         </div>
-        <div
-          style={{
-            flex: "0 0 auto",
-            paddingTop: 4,
-          }}
-        >
+        <div className="builder-add-task">
           <AddTaskForm onAdd={addTask} />
         </div>
       </div>

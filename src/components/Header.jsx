@@ -23,7 +23,6 @@ export default function Header({
   onLoad,
   onClear,
   isRunning,
-  setIsRunning,
 }) {
   const [open, setOpen] = React.useState(false);
 
@@ -33,7 +32,6 @@ export default function Header({
     } else {
       onStart();
     }
-    setIsRunning(!isRunning);
   };
 
   const actions = [

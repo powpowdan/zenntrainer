@@ -101,8 +101,6 @@ export default function Timeline({
 
             {/* Task blocks */}
             {tasksWithHighlight.map((task, index) => {
-              const isSelected = selectedTask && selectedTask.id === task.id;
-
               return (
                 <Draggable
                   key={task.id}

@@ -4,6 +4,7 @@
   --bg-surface-alt: #10141b;
   --border-subtle: #1f2933;
   --accent-primary: #3b82f6;
+  --accent-lime: #9ef01a;
   --accent-success: #22c55e;
   --accent-danger: #ef4444;
   --text-primary: #f5f7fa;
@@ -73,6 +74,10 @@ button {
   cursor: pointer;
   transition: background-color 0.2s ease, border-color 0.2s ease,
     transform 0.1s ease;
+}
+
+button:disabled {
+  cursor: default;
 }
 
 button:hover {
