@@ -20,7 +20,7 @@ export default function Login({ onGuest }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', background: 'var(--bg-app)', color: 'var(--text-primary)' }}>
-      <h1>Zenntrainer Login</h1>
+      <h1>ZennClass Login</h1>
       <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
         <input
           type="email"
