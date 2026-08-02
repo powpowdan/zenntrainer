@@ -23,6 +23,9 @@ export default function Header({
   onLoad,
   onClear,
   isRunning,
+  taskCount,
+  totalDuration,
+  canStart,
 }) {
   const [open, setOpen] = React.useState(false);
 
@@ -39,6 +42,8 @@ export default function Header({
     { icon: <FolderOpenIcon />, name: "Load", onClick: onLoad },
     { icon: <DeleteIcon />, name: "Clear", onClick: onClear },
   ];
+
+  const totalMinutes = Math.round((totalDuration || 0) / 60);
 
   return (
     <AppBar
@@ -74,18 +79,30 @@ export default function Header({
           >
             Zenn Class Tracker
           </Typography>
-          <Typography
-            variant="body2"
-            sx={{ color: "var(--text-muted)", fontSize: 12 }}
-          >
-            Plan and run Muay Thai sessions
-          </Typography>
+           <Typography
+             variant="body2"
+             sx={{ color: "var(--text-muted)", fontSize: 12 }}
+           >
+             Plan and run Muay Thai sessions
+           </Typography>
+           <Typography
+             variant="body2"
+             sx={{
+               color: "var(--text-secondary)",
+               fontSize: 12,
+               mt: 0.5,
+               fontVariantNumeric: "tabular-nums",
+             }}
+           >
+             {taskCount} {taskCount === 1 ? "block" : "blocks"} · {totalMinutes} min planned
+           </Typography>
         </div>
 
         <Stack direction="row" spacing={1} alignItems="center">
           <Button
             variant="contained"
             onClick={handleToggle}
+            disabled={!isRunning && !canStart}
             sx={{
               borderRadius: 999,
               px: 2.5,

@@ -82,7 +82,7 @@ export default function Timeline({
               borderRadius: "16px 16px 0 0",
               borderTop: "1px solid var(--border-subtle)",
             }}
-          >
+            >
             {/* Horizontal progress line */}
             <div
               style={{
@@ -98,6 +98,17 @@ export default function Timeline({
                 zIndex: 10,
               }}
             />
+
+            {tasks.length === 0 ? (
+              <div className="timeline-empty-state">
+                <span className="timeline-empty-kicker">Your class plan is empty</span>
+                <h2>Add your first timed block</h2>
+                <p>
+                  Build the session in order, then add coaching notes before you start.
+                </p>
+                <span className="timeline-empty-hint">Use “Add block” below to begin.</span>
+              </div>
+            ) : null}
 
             {/* Task blocks */}
             {tasksWithHighlight.map((task, index) => {

@@ -24,7 +24,7 @@ export default function App() {
   const [baseElapsed, setBaseElapsed] = useState(0);
   const [runStartedAt, setRunStartedAt] = useState(null);
   const [transitionTask, setTransitionTask] = useState(null);
-  const [selectedTask, setSelectedTask] = useState(null);
+  const [selectedTaskId, setSelectedTaskId] = useState(null);
   const transitionTimer = useRef(null);
   const previousActiveIndex = useRef(null);
   const suppressTransition = useRef(false);
@@ -112,6 +112,18 @@ export default function App() {
   })();
 
   const activeTask = activeIndex >= 0 ? tasks[activeIndex] : null;
+  const selectedTask = tasks.find((task) => task.id === selectedTaskId) || null;
+
+  useEffect(() => {
+    if (!tasks.length) {
+      if (selectedTaskId !== null) setSelectedTaskId(null);
+      return;
+    }
+
+    if (!tasks.some((task) => task.id === selectedTaskId)) {
+      setSelectedTaskId(tasks[0].id);
+    }
+  }, [selectedTaskId, tasks]);
 
   useEffect(() => {
     if (activeIndex < 0) {
@@ -312,6 +324,9 @@ export default function App() {
           else setGuestMode(false);
         }}
         isRunning={isRunning}
+        taskCount={tasks.length}
+        totalDuration={totalDuration}
+        canStart={tasks.length > 0 && totalDuration > 0}
       />
       <div className="builder-content">
         <div className="builder-timeline">
@@ -320,7 +335,7 @@ export default function App() {
             setTasks={setTasks}
             onDelete={deleteTask}
             elapsedTime={elapsedTime / 60}
-            onSelectTask={setSelectedTask}
+            onSelectTask={(task) => setSelectedTaskId(task.id)}
             selectedTask={selectedTask}
           />
         </div>

@@ -3,6 +3,7 @@
   --bg-surface: #0e1116;
   --bg-surface-alt: #10141b;
   --border-subtle: #1f2933;
+  --border-strong: #334155;
   --accent-primary: #3b82f6;
   --accent-lime: #9ef01a;
   --accent-success: #22c55e;
@@ -90,4 +91,11 @@ button:focus,
 button:focus-visible {
   outline: 2px solid var(--accent-primary);
   outline-offset: 2px;
+}
+
+.builder-content,
+.builder-timeline,
+.builder-notes,
+.builder-add-task {
+  min-width: 0;
 }
