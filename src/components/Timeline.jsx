@@ -4,40 +4,23 @@ import { useState } from "react";
 
 export default function Timeline({
   tasks,
-  setTasks,
   onDelete,
-  elapsedTime,
+  onReorder,
   onSelectTask,
   selectedTask,
 }) {
-  const PIXELS_PER_MINUTE = 6; // must match TaskBlock
+  const PIXELS_PER_MINUTE = 6;
+  const MIN_BLOCK_HEIGHT = 64;
   const [isDragging, setIsDragging] = useState(false);
-  const totalDuration = tasks.reduce((sum, t) => sum + t.duration, 0);
 
-  // Total timeline height in px
-  const timelineHeight = totalDuration * PIXELS_PER_MINUTE;
+  const getBlockHeight = (task) =>
+    Math.max(Number(task.duration || 0) * PIXELS_PER_MINUTE, MIN_BLOCK_HEIGHT);
 
-  // Vertical position of progress line
-  const progressPercent = totalDuration
-    ? Math.min(elapsedTime / totalDuration, 1)
-    : 0;
-  const progressPx = timelineHeight * progressPercent;
+  const tasksWithHeight = tasks.map((task) => ({
+    ...task,
+    taskHeight: getBlockHeight(task),
+  }));
 
-  // Determine which task is visually active based on progress line
-  let cumulativePx = 0;
-  const tasksWithHighlight = tasks.map((task) => {
-    const taskHeight = task.duration * PIXELS_PER_MINUTE;
-    const startPx = cumulativePx;
-    const endPx = cumulativePx + taskHeight;
-    cumulativePx = endPx;
-
-    // Active only when the progress line has *entered* this block
-    const isActive = progressPx > startPx && progressPx <= endPx;
-
-    return { ...task, isActive };
-  });
-
-  // Handle drag & drop reordering
   const handleDragEnd = (result) => {
     setIsDragging(false);
     if (!result.destination) return;
@@ -51,17 +34,11 @@ export default function Timeline({
     const newTasks = Array.from(tasks);
     const [movedTask] = newTasks.splice(result.source.index, 1);
     newTasks.splice(result.destination.index, 0, movedTask);
-    setTasks(newTasks);
+    onReorder(newTasks);
   };
 
   const handleDragStart = () => {
     setIsDragging(true);
-  };
-
-  const handleEditPlan = (taskId, newPlan) => {
-    setTasks((prev) =>
-      prev.map((t) => (t.id === taskId ? { ...t, plan: newPlan } : t))
-    );
   };
 
   return (
@@ -76,29 +53,12 @@ export default function Timeline({
               width: "100%",
               height: "100%",
               overflowY: "auto",
-              background:
-                "radial-gradient(circle at top, rgba(37, 99, 235, 0.12), transparent 55%), var(--bg-surface)",
+              background: "var(--surface)",
               padding: "8px 10px",
-              borderRadius: "16px 16px 0 0",
+              borderRadius: "var(--radius-md) var(--radius-md) 0 0",
               borderTop: "1px solid var(--border-subtle)",
             }}
-            >
-            {/* Horizontal progress line */}
-            <div
-              style={{
-                position: "absolute",
-                top: progressPx,
-                left: 0,
-                width: "100%",
-                height: "2px",
-                background:
-                  "linear-gradient(90deg, transparent, var(--accent-primary), transparent)",
-                boxShadow: "0 0 10px rgba(59,130,246,0.4)",
-                transition: "top 0.12s linear",
-                zIndex: 10,
-              }}
-            />
-
+          >
             {tasks.length === 0 ? (
               <div className="timeline-empty-state">
                 <span className="timeline-empty-kicker">Your class plan is empty</span>
@@ -110,8 +70,7 @@ export default function Timeline({
               </div>
             ) : null}
 
-            {/* Task blocks */}
-            {tasksWithHighlight.map((task, index) => {
+            {tasksWithHeight.map((task, index) => {
               return (
                 <Draggable
                   key={task.id}
@@ -121,25 +80,27 @@ export default function Timeline({
                   {(provided, snapshot) => (
                     <div
                       ref={provided.innerRef}
+                      className="timeline-draggable"
                       {...provided.draggableProps}
                       {...provided.dragHandleProps}
+                      aria-label={`Reorder block ${index + 1}: ${task.name}`}
                       style={{
                         ...provided.draggableProps.style,
                         width: "100%",
                         boxShadow: snapshot.isDragging
-                          ? "0 10px 30px rgba(15,23,42,0.9)"
-                          : "0 1px 4px rgba(0,0,0,0.45)",
-                        borderRadius: "12px",
+                          ? "0 10px 30px rgba(0, 0, 0, 0.9)"
+                          : "0 1px 4px rgba(0, 0, 0, 0.45)",
+                        borderRadius: "var(--radius-sm)",
                         marginBottom: "6px",
                         touchAction: "pan-y",
                       }}
                     >
                       <TaskBlock
                         task={task}
+                        sequence={index + 1}
+                        height={task.taskHeight}
                         onDelete={onDelete}
-                        highlight={task.isActive}
                         selected={selectedTask && selectedTask.id === task.id}
-                        onEdit={handleEditPlan}
                         onSelect={() => onSelectTask(task)}
                       />
                     </div>
@@ -152,7 +113,6 @@ export default function Timeline({
           </div>
         )}
       </Droppable>
-      {/* Floating Trash Zone */}
       <Droppable droppableId="trash">
         {(provided, snapshot) => (
           <div
@@ -166,9 +126,11 @@ export default function Timeline({
               height: "auto",
               padding: 10,
               backgroundColor: snapshot.isDraggingOver
-                ? "rgba(248, 113, 113, 0.95)"
-                : "rgba(31, 41, 55, 0.96)",
-              color: "var(--text-primary)",
+                ? "var(--accent)"
+                : "var(--surface)",
+              color: snapshot.isDraggingOver
+                ? "var(--on-accent)"
+                : "var(--text-primary)",
               textAlign: "center",
               fontSize: 16,
               zIndex: 1000,
@@ -178,11 +140,11 @@ export default function Timeline({
                 "opacity 0.4s ease, background-color 0.3s ease, transform 0.2s ease",
               transform: snapshot.isDraggingOver ? "scale(1.05)" : "scale(1)",
               boxShadow: snapshot.isDraggingOver
-                ? "0 0 18px rgba(248,113,113,0.75)"
-                : "0 -6px 20px rgba(0,0,0,0.7)",
+                ? "0 0 18px color-mix(in srgb, var(--accent) 70%, transparent)"
+                : "0 -6px 20px rgba(0, 0, 0, 0.7)",
             }}
           >
-            🗑 Drag here to delete
+            <span aria-hidden="true">Drag block here to delete</span>
             {provided.placeholder}
           </div>
         )}

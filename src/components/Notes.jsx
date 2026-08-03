@@ -1,18 +1,14 @@
 import { useEffect, useState } from "react";
 
-const PALETTE = ["#22c55e", "#38bdf8", "#f97316", "#f97373", "#a855f7"];
-
 export default function Notes({ task, onUpdateTask, onDeleteTask }) {
   const [name, setName] = useState(task?.name || "");
   const [duration, setDuration] = useState(task?.duration || "");
-  const [color, setColor] = useState(task?.color || "");
   const [text, setText] = useState(task?.plan || "");
   const [error, setError] = useState("");
 
   useEffect(() => {
     setName(task?.name || "");
     setDuration(task?.duration || "");
-    setColor(task?.color || "");
     setText(task?.plan || "");
     setError("");
   }, [task]);
@@ -43,7 +39,6 @@ export default function Notes({ task, onUpdateTask, onDeleteTask }) {
     onUpdateTask(task.id, {
       name: trimmedName,
       duration: numericDuration,
-      color: color || task.color,
       plan: text.trim(),
     });
     setError("");
@@ -52,7 +47,6 @@ export default function Notes({ task, onUpdateTask, onDeleteTask }) {
   const resetDraft = () => {
     setName(task.name || "");
     setDuration(task.duration || "");
-    setColor(task.color || "");
     setText(task.plan || "");
     setError("");
   };
@@ -93,23 +87,6 @@ export default function Notes({ task, onUpdateTask, onDeleteTask }) {
           rows={7}
         />
       </label>
-
-      <fieldset className="color-field">
-        <legend>Block color</legend>
-        <div className="color-options">
-          {PALETTE.map((paletteColor) => (
-            <button
-              key={paletteColor}
-              type="button"
-              className="color-option"
-              style={{ backgroundColor: paletteColor }}
-              onClick={() => setColor(paletteColor)}
-              aria-label={`Choose ${paletteColor} block color`}
-              aria-pressed={color === paletteColor}
-            />
-          ))}
-        </div>
-      </fieldset>
 
       {error ? <p className="form-error" role="alert">{error}</p> : null}
 

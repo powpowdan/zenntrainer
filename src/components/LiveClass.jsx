@@ -86,7 +86,6 @@ export default function LiveClass({
 
       <section
         className="live-block-card"
-        style={{ "--block-accent": activeTask.color || "#9ef01a" }}
       >
         {transitionTask && (
           <div className="live-transition" role="status">

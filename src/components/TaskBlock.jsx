@@ -1,69 +1,87 @@
+import { Box } from "@mui/material";
+
 export default function TaskBlock({
   task,
-  highlight,
+  sequence,
+  height,
   onSelect,
   selected,
 }) {
-  const PIXELS_PER_MINUTE = 6;
-
-  const isActive = highlight || selected;
-
-  const accent = task.color || "var(--accent-primary)";
-
   return (
-    <div
+    <Box
       onClick={onSelect}
-      style={{
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onSelect();
+        }
+      }}
+      role="button"
+      tabIndex={0}
+      aria-pressed={selected}
+      aria-label={`${sequence}. ${task.name}, ${task.duration} minutes${selected ? ", selected" : ""}`}
+      sx={{
         width: "100%",
         minWidth: 0,
-        height: `${task.duration * PIXELS_PER_MINUTE}px`,
-        backgroundColor: isActive
-          ? "rgba(15,23,42,0.85)"
-          : "rgba(15,23,42,0.7)",
+        minHeight: 64,
+        height: `${height}px`,
+        backgroundColor: selected ? "var(--elevated)" : "var(--surface)",
         border: "1px solid var(--border-subtle)",
-        borderLeft: `3px solid ${accent}aa`,
-        borderRadius: "12px",
+        borderLeft: "3px solid var(--border-subtle)",
+        borderRadius: "var(--radius-sm)",
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
         padding: "0 12px",
         color: "var(--text-primary)",
         cursor: "grab",
-        fontSize: isActive ? "15px" : "14px",
-        fontWeight: isActive ? "600" : "500",
+        fontSize: selected ? "15px" : "14px",
+        fontWeight: selected ? 600 : 500,
         letterSpacing: "0.3px",
         userSelect: "none",
-        boxShadow: isActive
-          ? "0 0 12px rgba(15,23,42,0.9)"
-          : "0 1px 3px rgba(0,0,0,0.4)",
+        boxShadow: selected
+          ? "0 0 12px color-mix(in srgb, var(--accent) 22%, transparent)"
+          : "0 1px 3px rgba(0, 0, 0, 0.4)",
+        outline: selected ? "2px solid var(--accent)" : undefined,
+        outlineOffset: selected ? "2px" : undefined,
         transition: "all 0.2s ease",
-        backdropFilter: "blur(4px)",
+        "&:focus-visible": {
+          outline: "3px solid var(--accent)",
+          outlineOffset: "3px",
+        },
       }}
     >
-      <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-        <span
-          style={{
-            display: "flex",
-            alignItems: "baseline",
-            gap: 6,
-          }}
+      <Box sx={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+        <Box
+          component="span"
+          sx={{ display: "flex", alignItems: "baseline", gap: "6px" }}
         >
-          <span style={{ fontWeight: 600 }}>{task.name}</span>
-          <span
-            style={{
-              fontSize: 11,
+          <span className="task-block-title" style={{ fontWeight: 600 }}>
+            <span className="task-block-sequence">{sequence}</span>
+            {task.name}
+          </span>
+          <Box
+            component="span"
+            sx={{
+              fontSize: "11px",
               color: "var(--text-muted)",
               textTransform: "uppercase",
-              letterSpacing: 0.6,
+              letterSpacing: "0.6px",
+              fontFamily: "var(--font-numeric)",
+              fontVariantNumeric: "tabular-nums",
             }}
           >
             {task.duration} min
-          </span>
+          </Box>
+        </Box>
+        <span className="task-block-state" aria-hidden="true">
+          {selected ? "Selected" : ""}
         </span>
         {task.plan ? (
-          <span
-            style={{
-              fontSize: 11,
+          <Box
+            component="span"
+            sx={{
+              fontSize: "11px",
               color: "var(--text-secondary)",
               whiteSpace: "nowrap",
               overflow: "hidden",
@@ -72,18 +90,13 @@ export default function TaskBlock({
             }}
           >
             {task.plan}
-          </span>
+          </Box>
         ) : (
-          <span
-            style={{
-              fontSize: 11,
-              color: "var(--text-muted)",
-            }}
-          >
-            Add notes in panel →
-          </span>
+          <Box component="span" sx={{ fontSize: "11px", color: "var(--text-muted)" }}>
+            Add notes in editor
+          </Box>
         )}
-      </div>
-    </div>
+      </Box>
+    </Box>
   );
 }

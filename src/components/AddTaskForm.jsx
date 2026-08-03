@@ -1,19 +1,28 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export default function AddTaskForm({ onAdd }) {
   const [isOpen, setIsOpen] = useState(false);
   const [name, setName] = useState("");
   const [duration, setDuration] = useState("");
-  const [color, setColor] = useState("");
   const [plan, setPlan] = useState("");
   const [error, setError] = useState("");
+  const triggerRef = useRef(null);
+  const firstFieldRef = useRef(null);
+  const wasOpenRef = useRef(false);
 
-  const palette = ["#22c55e", "#38bdf8", "#f97316", "#f97373", "#a855f7"];
+  useEffect(() => {
+    if (isOpen) {
+      wasOpenRef.current = true;
+      firstFieldRef.current?.focus();
+    } else if (wasOpenRef.current) {
+      wasOpenRef.current = false;
+      triggerRef.current?.focus();
+    }
+  }, [isOpen]);
 
   const resetForm = () => {
     setName("");
     setDuration("");
-    setColor("");
     setPlan("");
     setError("");
     setIsOpen(false);
@@ -37,7 +46,6 @@ export default function AddTaskForm({ onAdd }) {
     onAdd({
       name: trimmedName,
       duration: numericDuration,
-      color,
       plan: plan.trim(),
     });
     resetForm();
@@ -46,6 +54,7 @@ export default function AddTaskForm({ onAdd }) {
   if (!isOpen) {
     return (
       <button
+        ref={triggerRef}
         onClick={() => setIsOpen(true)}
         type="button"
         className="add-task-trigger"
@@ -53,13 +62,12 @@ export default function AddTaskForm({ onAdd }) {
           width: "100%",
           padding: "10px 14px",
           fontSize: "15px",
-          background:
-            "linear-gradient(90deg, var(--accent-primary), var(--accent-success))",
-          color: "white",
+          background: "var(--text-primary)",
+          color: "var(--app)",
           border: "none",
-          borderRadius: "999px",
+          borderRadius: "var(--radius-pill)",
           fontWeight: 600,
-          letterSpacing: 0.4,
+          letterSpacing: "0.4px",
         }}
       >
         Add block
@@ -68,9 +76,15 @@ export default function AddTaskForm({ onAdd }) {
   }
 
   return (
-      <div
-        role="presentation"
-        style={{
+    <div
+      role="presentation"
+      onKeyDown={(event) => {
+        if (event.key === "Escape") {
+          event.preventDefault();
+          resetForm();
+        }
+      }}
+      style={{
         position: "fixed",
         inset: 0,
         zIndex: 40,
@@ -79,30 +93,31 @@ export default function AddTaskForm({ onAdd }) {
         justifyContent: "center",
       }}
     >
-      {/* Scrim */}
       <div
         onClick={resetForm}
         style={{
           position: "absolute",
           inset: 0,
-          backgroundColor: "rgba(0,0,0,0.65)",
+          backgroundColor: "rgba(0, 0, 0, 0.65)",
         }}
       />
 
-      {/* Bottom sheet / modal card */}
       <form
         onSubmit={handleSubmit}
+        role="dialog"
+        aria-modal="true"
         aria-labelledby="add-task-title"
+        aria-describedby={error ? "add-task-error" : undefined}
         style={{
           position: "relative",
           width: "100%",
           maxWidth: 440,
           margin: "0 auto",
-          background: "var(--bg-surface-alt)",
-          borderTopLeftRadius: 16,
-          borderTopRightRadius: 16,
+          background: "var(--elevated)",
+          borderTopLeftRadius: "var(--radius-md)",
+          borderTopRightRadius: "var(--radius-md)",
           padding: "14px 14px 12px",
-          boxShadow: "0 -16px 40px rgba(0,0,0,0.85)",
+          boxShadow: "0 -16px 40px rgba(0, 0, 0, 0.85)",
           boxSizing: "border-box",
         }}
       >
@@ -134,8 +149,10 @@ export default function AddTaskForm({ onAdd }) {
               color: "var(--text-secondary)",
               fontSize: 18,
               lineHeight: 1,
-              padding: 4,
-              borderRadius: 999,
+              minWidth: 44,
+              minHeight: 44,
+              padding: 8,
+              borderRadius: "var(--radius-pill)",
             }}
           >
             ×
@@ -152,37 +169,26 @@ export default function AddTaskForm({ onAdd }) {
           <label className="form-field">
             <span>Block name</span>
             <input
-            placeholder="e.g. Warmup"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            aria-invalid={Boolean(error && !name.trim())}
-            style={{
-              padding: "8px",
-              borderRadius: "6px",
-              border: "1px solid #4b5563",
-              backgroundColor: "#020617",
-              color: "var(--text-primary)",
-            }}
+              id="add-task-name"
+              ref={firstFieldRef}
+              placeholder="e.g. Warmup"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              aria-invalid={Boolean(error && !name.trim())}
             />
           </label>
 
           <label className="form-field">
             <span>Duration</span>
             <input
-            type="number"
-            placeholder="Minutes"
-            value={duration}
-            onChange={(e) => setDuration(e.target.value)}
-            min={1}
-            step="any"
-            aria-invalid={Boolean(error && (!duration || Number(duration) <= 0))}
-            style={{
-              padding: "8px",
-              borderRadius: "6px",
-              border: "1px solid #4b5563",
-              backgroundColor: "#020617",
-              color: "var(--text-primary)",
-            }}
+              id="add-task-duration"
+              type="number"
+              placeholder="Minutes"
+              value={duration}
+              onChange={(e) => setDuration(e.target.value)}
+              min={1}
+              step="any"
+              aria-invalid={Boolean(error && (!duration || Number(duration) <= 0))}
             />
           </label>
 
@@ -195,49 +201,9 @@ export default function AddTaskForm({ onAdd }) {
               rows={3}
             />
           </label>
-
-          <div style={{ marginTop: 2 }}>
-            <div
-              style={{
-                fontSize: 12,
-                color: "var(--text-secondary)",
-                marginBottom: 4,
-              }}
-            >
-              Pick a color <em>Optional</em>
-            </div>
-            <div
-              style={{
-                display: "flex",
-                gap: 8,
-                flexWrap: "wrap",
-              }}
-            >
-              {palette.map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  onClick={() => setColor(c)}
-                  aria-label={`Choose ${c} block color`}
-                  aria-pressed={color === c}
-                  style={{
-                    width: 30,
-                    height: 30,
-                    borderRadius: "999px",
-                    border:
-                      color === c ? "2px solid #e5e7eb" : "1px solid #4b5563",
-                    padding: 0,
-                    backgroundColor: c,
-                    boxShadow:
-                      color === c ? "0 0 0 2px rgba(15,23,42,0.9)" : "none",
-                  }}
-                />
-              ))}
-            </div>
-          </div>
         </div>
 
-        {error ? <p className="form-error" role="alert">{error}</p> : null}
+        {error ? <p id="add-task-error" className="form-error" role="alert">{error}</p> : null}
 
         <div
           style={{
@@ -250,12 +216,11 @@ export default function AddTaskForm({ onAdd }) {
             type="submit"
             style={{
               flex: 1,
-              background:
-                "linear-gradient(90deg, var(--accent-primary), var(--accent-success))",
-              color: "white",
+              background: "var(--text-primary)",
+              color: "var(--app)",
               border: "none",
               padding: "9px",
-              borderRadius: "999px",
+              borderRadius: "var(--radius-pill)",
               marginRight: 6,
               fontWeight: 600,
             }}
@@ -266,11 +231,11 @@ export default function AddTaskForm({ onAdd }) {
             type="button"
             onClick={resetForm}
             style={{
-              background: "#111827",
+              background: "var(--surface)",
               color: "var(--text-secondary)",
-              border: "1px solid #4b5563",
+              border: "1px solid var(--border-strong)",
               padding: "9px 14px",
-              borderRadius: "999px",
+              borderRadius: "var(--radius-pill)",
               fontWeight: 500,
             }}
           >

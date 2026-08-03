@@ -7,12 +7,21 @@ import LiveClass from "./components/LiveClass";
 import Login from "./Login";
 import { supabase } from "./supabaseClient";
 
-const COLOR_PALETTE = ["#22c55e", "#38bdf8", "#f97316", "#f97373", "#a855f7"];
-
-const getRandomColor = () =>
-  COLOR_PALETTE[Math.floor(Math.random() * COLOR_PALETTE.length)];
-
 const getDuration = (task) => Number(task.duration) || 0;
+
+const normalizeTasks = (taskList) =>
+  taskList.map((task, index) => ({ ...task, position: index }));
+
+const getTaskFields = (task, position) => ({
+  name: task.name,
+  duration: Number(task.duration),
+  color: task.color,
+  plan: task.plan || "",
+  position,
+});
+
+const createLocalTaskId = () =>
+  `local-${crypto.randomUUID?.() || `${Date.now()}-${Math.random()}`}`;
 
 export default function App() {
   const [session, setSession] = useState(null);
@@ -25,23 +34,28 @@ export default function App() {
   const [runStartedAt, setRunStartedAt] = useState(null);
   const [transitionTask, setTransitionTask] = useState(null);
   const [selectedTaskId, setSelectedTaskId] = useState(null);
+  const [persistenceStatus, setPersistenceStatus] = useState("saved");
+  const [persistenceError, setPersistenceError] = useState("");
   const transitionTimer = useRef(null);
   const previousActiveIndex = useRef(null);
   const suppressTransition = useRef(false);
+  const persistenceQueue = useRef(Promise.resolve());
+  const persistedIdMap = useRef(new Map());
+  const planRevision = useRef(0);
 
   const [tasks, setTasks] = useState(() => {
     const saved = localStorage.getItem("savedClass");
     return saved
-      ? JSON.parse(saved)
-      : [
-          { id: 1, name: "Warmup", duration: 20, color: "#22c55e", plan: "5-7 min skip ropes. run, pushups" },
-          { id: 2, name: "Stretch", duration: 10, color: "#38bdf8", plan: "7 point stretch, focus on shoulder more this class" },
-          { id: 3, name: "Technical", duration: 10, color: "#f97316", plan: "Phase 1: teep / jab/ cross, tiger step, jab / cross /knee \nPhase 2: jab/ cross, step aside, jab, body kick" },
-          { id: 4, name: "Cardio", duration: 10, color: "#f97373", plan: "run and then sprints on side and pushups" },
-          { id: 5, name: "Heavy bag", duration: 10, color: "#a855f7", plan: "Same as technical, add low kick. " },
-          { id: 6, name: "Warmup2", duration: 8, color: "#22c55e", plan: "Teep teep teep teep asdd" },
-          { id: 7, name: "Stretch2", duration: 10, color: "#38bdf8", plan: "heavy bag burnout kicks" },
-        ];
+      ? normalizeTasks(JSON.parse(saved))
+      : normalizeTasks([
+          { id: 1, name: "Warmup", duration: 20, plan: "5-7 min skip ropes. run, pushups" },
+          { id: 2, name: "Stretch", duration: 10, plan: "7 point stretch, focus on shoulder more this class" },
+          { id: 3, name: "Technical", duration: 10, plan: "Phase 1: teep / jab/ cross, tiger step, jab / cross /knee \nPhase 2: jab/ cross, step aside, jab, body kick" },
+          { id: 4, name: "Cardio", duration: 10, plan: "run and then sprints on side and pushups" },
+          { id: 5, name: "Heavy bag", duration: 10, plan: "Same as technical, add low kick. " },
+          { id: 6, name: "Warmup2", duration: 8, plan: "Teep teep teep teep asdd" },
+          { id: 7, name: "Stretch2", duration: 10, plan: "heavy bag burnout kicks" },
+        ]);
   });
 
   useEffect(() => {
@@ -61,7 +75,9 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (session) fetchTasks();
+    if (session) {
+      fetchTasks();
+    }
   }, [session]);
 
   const totalDuration = tasks.reduce(
@@ -162,47 +178,181 @@ export default function App() {
     const { data, error } = await supabase
       .from("tasks")
       .select("*")
+      .order("position", { ascending: true })
       .order("id", { ascending: true });
-    if (error) console.error("Error fetching tasks:", error);
-    else setTasks(data);
+    if (error) {
+      console.error("Error fetching tasks:", error);
+      setPersistenceStatus("error");
+      setPersistenceError("Could not load the saved plan.");
+      return;
+    }
+
+    setTasks(normalizeTasks(data || []));
+    setPersistenceStatus("saved");
+    setPersistenceError("");
+  };
+
+  const enqueuePersistence = (operation) => {
+    const nextOperation = persistenceQueue.current.then(operation, operation);
+    persistenceQueue.current = nextOperation.catch(() => undefined);
+    return nextOperation;
+  };
+
+  const persistAuthenticatedPlan = async (previousTasks, nextTasks) => {
+    const resolveIds = (taskList) =>
+      taskList.map((task) => {
+        const persistedId = persistedIdMap.current.get(task.id);
+        return persistedId ? { ...task, id: persistedId } : task;
+      });
+
+    previousTasks = resolveIds(previousTasks);
+    nextTasks = resolveIds(nextTasks);
+    const previousIds = new Set(previousTasks.map((task) => task.id));
+    const insertedTasks = nextTasks.filter((task) => !previousIds.has(task.id));
+    const insertedById = new Map();
+
+    for (const task of insertedTasks) {
+      const { data, error } = await supabase
+        .from("tasks")
+        .insert({
+          ...getTaskFields(task, -1000000 - task.position),
+          user_id: session.user.id,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      insertedById.set(task.id, data);
+      persistedIdMap.current.set(task.id, data.id);
+    }
+
+    const persistedTasks = nextTasks.map((task) =>
+      insertedById.has(task.id)
+        ? { ...task, ...insertedById.get(task.id) }
+        : task
+    );
+    const nextIds = new Set(persistedTasks.map((task) => task.id));
+
+    await Promise.all(
+      previousTasks
+        .filter((task) => !nextIds.has(task.id))
+        .map(async (task) => {
+          const { error } = await supabase
+            .from("tasks")
+            .delete()
+            .eq("id", task.id)
+            .eq("user_id", session.user.id);
+          if (error) throw error;
+        })
+    );
+
+    const existingTasks = persistedTasks.filter((task) => previousIds.has(task.id));
+    await Promise.all(
+      existingTasks.map(async (task, index) => {
+        const { error } = await supabase
+          .from("tasks")
+          .update({ position: -1000000 - index })
+          .eq("id", task.id)
+          .eq("user_id", session.user.id);
+        if (error) throw error;
+      })
+    );
+
+    await Promise.all(
+      persistedTasks.map(async (task, index) => {
+        const { error } = await supabase
+          .from("tasks")
+          .update(getTaskFields(task, index))
+          .eq("id", task.id)
+          .eq("user_id", session.user.id);
+        if (error) throw error;
+      })
+    );
+
+    return normalizeTasks(persistedTasks);
+  };
+
+  const commitPlan = (nextTasks, previousTasks = tasks) => {
+    const normalizedTasks = normalizeTasks(nextTasks);
+    const revision = ++planRevision.current;
+    setTasks(normalizedTasks);
+    setPersistenceError("");
+
+    if (!session) {
+      setPersistenceStatus("unsaved");
+      return Promise.resolve(normalizedTasks);
+    }
+
+    setPersistenceStatus("saving");
+    return enqueuePersistence(async () => {
+      try {
+        const persistedTasks = await persistAuthenticatedPlan(
+          previousTasks,
+          normalizedTasks
+        );
+        if (revision === planRevision.current) {
+          setTasks(persistedTasks);
+          setPersistenceStatus("saved");
+        }
+        return persistedTasks;
+      } catch (error) {
+        console.error("Error saving plan:", error);
+        if (revision === planRevision.current) {
+          setPersistenceStatus("error");
+          setPersistenceError("Could not save the plan. Your visible edits were kept.");
+        }
+        return null;
+      }
+    });
   };
 
   const updateTask = (id, updates) => {
-    setTasks((prev) =>
-      prev.map((task) => (task.id === id ? { ...task, ...updates } : task))
+    commitPlan(
+      tasks.map((task) => (task.id === id ? { ...task, ...updates } : task))
     );
   };
 
-  const addTask = async (task) => {
-    const taskWithColor = { ...task, color: task.color || getRandomColor() };
-    if (session) {
-      const newTask = { ...taskWithColor, user_id: session.user.id };
-      const { data, error } = await supabase
-        .from("tasks")
-        .insert([newTask])
-        .select();
-
-      if (error) console.error("Error adding task:", error);
-      else setTasks((prev) => [...prev, ...data]);
-    } else {
-      setTasks((prev) => [...prev, { ...taskWithColor, id: Date.now() }]);
-    }
+  const addTask = (task) => {
+    const taskWithId = {
+      ...task,
+      id: session ? createLocalTaskId() : Date.now(),
+    };
+    commitPlan([...tasks, taskWithId]);
   };
 
-  const deleteTask = async (id) => {
+  const deleteTask = (id) => {
     const task = tasks.find((item) => item.id === id);
     if (task && !window.confirm(`Delete “${task.name}”?`)) return;
 
-    const oldTasks = [...tasks];
-    setTasks(tasks.filter((task) => task.id !== id));
+    commitPlan(tasks.filter((item) => item.id !== id));
+  };
 
+  const savePlan = () => {
     if (session) {
-      const { error } = await supabase.from("tasks").delete().eq("id", id);
-      if (error) {
-        console.error("Error deleting task", error);
-        setTasks(oldTasks);
-      }
+      commitPlan(tasks);
+      return;
     }
+
+    localStorage.setItem("savedClass", JSON.stringify(normalizeTasks(tasks)));
+    setPersistenceStatus("saved");
+    setPersistenceError("");
+  };
+
+  const loadPlan = () => {
+    if (session) {
+      fetchTasks();
+      return;
+    }
+
+    const saved = localStorage.getItem("savedClass");
+    if (!saved) return;
+    setTasks(normalizeTasks(JSON.parse(saved)));
+    setPersistenceStatus("saved");
+    setPersistenceError("");
+  };
+
+  const retryPersistence = () => {
+    commitPlan(tasks);
   };
 
   const startClass = () => {
@@ -296,19 +446,14 @@ export default function App() {
   return (
     <div className="app-shell">
       <Header
-        onStart={startClass}
-        onPause={pauseClass}
-        onReset={resetClass}
-        onSave={() => {
-          if (!session) localStorage.setItem("savedClass", JSON.stringify(tasks));
-          alert(session ? "Auto-saved to cloud!" : "Manual save complete!");
-        }}
-        onLoad={session
-          ? fetchTasks
-          : () => {
-              const saved = localStorage.getItem("savedClass");
-              if (saved) setTasks(JSON.parse(saved));
-            }}
+          onStart={startClass}
+          onPause={pauseClass}
+          onReset={resetClass}
+        onSave={savePlan}
+        onLoad={loadPlan}
+        onRetry={retryPersistence}
+        persistenceStatus={persistenceStatus}
+        persistenceError={persistenceError}
         onClear={() => {
           if (session) supabase.auth.signOut();
           else setGuestMode(false);
@@ -322,9 +467,8 @@ export default function App() {
         <div className="builder-timeline">
           <Timeline
             tasks={tasks}
-            setTasks={setTasks}
             onDelete={deleteTask}
-            elapsedTime={elapsedTime / 60}
+            onReorder={(nextTasks) => commitPlan(nextTasks)}
             onSelectTask={(task) => setSelectedTaskId(task.id)}
             selectedTask={selectedTask}
           />

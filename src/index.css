@@ -1,24 +1,10 @@
 :root {
-  --bg-app: #05060a;
-  --bg-surface: #0e1116;
-  --bg-surface-alt: #10141b;
-  --border-subtle: #1f2933;
-  --border-strong: #334155;
-  --accent-primary: #3b82f6;
-  --accent-lime: #9ef01a;
-  --accent-success: #22c55e;
-  --accent-danger: #ef4444;
-  --text-primary: #f5f7fa;
-  --text-secondary: #9ba3b4;
-  --text-muted: #5e6778;
-
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
-    sans-serif;
+  font-family: var(--font-ui);
   line-height: 1.5;
   font-weight: 400;
   color-scheme: dark;
   color: var(--text-primary);
-  background-color: var(--bg-app);
+  background-color: var(--app);
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -43,34 +29,35 @@ input,
 textarea,
 select {
   font-size: 16px;
+  font-family: inherit;
 }
 
 a {
   font-weight: 500;
-  color: var(--accent-primary);
+  color: var(--accent);
   text-decoration: none;
 }
 
 a:hover {
-  color: #60a5fa;
+  color: var(--accent-hover);
 }
 
 body {
   margin: 0;
-  background-color: var(--bg-app);
+  background-color: var(--app);
   color: var(--text-primary);
   min-width: 320px;
   min-height: 100vh;
 }
 
 button {
-  border-radius: 999px;
-  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-strong);
   padding: 0.6em 1.2em;
   font-size: 0.95rem;
-  font-weight: 500;
+  font-weight: 600;
   font-family: inherit;
-  background-color: #111827;
+  background-color: var(--surface);
   color: var(--text-primary);
   cursor: pointer;
   transition: background-color 0.2s ease, border-color 0.2s ease,
@@ -79,17 +66,18 @@ button {
 
 button:disabled {
   cursor: default;
+  opacity: 0.5;
 }
 
 button:hover {
-  border-color: var(--accent-primary);
-  background-color: #111827;
+  border-color: var(--accent);
+  background-color: var(--elevated);
   transform: translateY(-1px);
 }
 
 button:focus,
 button:focus-visible {
-  outline: 2px solid var(--accent-primary);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 

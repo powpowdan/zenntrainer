@@ -1,41 +1,92 @@
-import { useState } from 'react'
-import { supabase } from './supabaseClient'
+import { useState } from "react";
+import { Box, Button, Stack, TextField, Typography } from "@mui/material";
+import { supabase } from "./supabaseClient";
 
 export default function Login({ onGuest }) {
-  const [loading, setLoading] = useState(false)
-  const [email, setEmail] = useState('')
+  const [loading, setLoading] = useState(false);
+  const [email, setEmail] = useState("");
 
   const handleLogin = async (e) => {
-    e.preventDefault()
-    setLoading(true)
-    const { error } = await supabase.auth.signInWithOtp({ email })
+    e.preventDefault();
+    setLoading(true);
+    const { error } = await supabase.auth.signInWithOtp({ email });
 
     if (error) {
-      alert(error.error_description || error.message)
+      alert(error.error_description || error.message);
     } else {
-      alert('Check your email for the login link!')
+      alert("Check your email for the login link!");
     }
-    setLoading(false)
-  }
+    setLoading(false);
+  };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', background: 'var(--bg-app)', color: 'var(--text-primary)' }}>
-      <h1>ZennClass Login</h1>
-      <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-        <input
+    <Box
+      sx={{
+        minHeight: "100vh",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "var(--app)",
+        color: "var(--text-primary)",
+        px: 2,
+      }}
+    >
+      <Typography
+        variant="h4"
+        sx={{ fontWeight: 700, letterSpacing: "-0.03em", mb: 3 }}
+      >
+        Cadence
+      </Typography>
+      <Box
+        component="form"
+        onSubmit={handleLogin}
+        sx={{
+          width: "100%",
+          maxWidth: 360,
+          display: "flex",
+          flexDirection: "column",
+          gap: 2,
+          p: 3,
+          border: "1px solid var(--border-subtle)",
+          borderRadius: "var(--radius-md)",
+          background: "var(--surface)",
+        }}
+      >
+        <TextField
           type="email"
-          placeholder="Your email"
+          label="Your email"
+          placeholder="coach@gym.com"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          style={{ padding: '10px', borderRadius: '5px', border: '1px solid #ccc' }}
+          fullWidth
         />
-        <button disabled={loading} style={{ padding: '10px', cursor: 'pointer' }}>
-          {loading ? 'Sending magic link...' : 'Send Magic Link'}
-        </button>
-        <button type="button" onClick={onGuest} style={{ padding: '10px', cursor: 'pointer', background: 'transparent', border: '1px solid #ccc', color: 'inherit' }}>
-          Continue as Guest
-        </button>
-      </form>
-    </div>
-  )
+        <Button
+          type="submit"
+          variant="contained"
+          disabled={loading}
+          fullWidth
+          sx={{
+            backgroundColor: "var(--text-primary)",
+            color: "var(--app)",
+            "&:hover": {
+              backgroundColor: "var(--text-primary)",
+              opacity: 0.88,
+            },
+          }}
+        >
+          {loading ? "Sending magic link…" : "Send magic link"}
+        </Button>
+        <Button
+          type="button"
+          variant="text"
+          onClick={onGuest}
+          disabled={loading}
+          sx={{ color: "var(--text-secondary)" }}
+        >
+          Continue as guest
+        </Button>
+      </Box>
+    </Box>
+  );
 }

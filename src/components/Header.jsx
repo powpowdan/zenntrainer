@@ -11,7 +11,7 @@ import {
 } from "@mui/material";
 import SaveIcon from "@mui/icons-material/Save";
 import FolderOpenIcon from "@mui/icons-material/FolderOpen";
-import DeleteIcon from "@mui/icons-material/Delete";
+import LogoutIcon from "@mui/icons-material/Logout";
 import MenuIcon from "@mui/icons-material/Menu";
 import CloseIcon from "@mui/icons-material/Close";
 
@@ -21,11 +21,14 @@ export default function Header({
   onReset,
   onSave,
   onLoad,
+  onRetry,
   onClear,
   isRunning,
   taskCount,
   totalDuration,
   canStart,
+  persistenceStatus,
+  persistenceError,
 }) {
   const [open, setOpen] = React.useState(false);
 
@@ -38,23 +41,21 @@ export default function Header({
   };
 
   const actions = [
-    { icon: <SaveIcon />, name: "Save", onClick: onSave },
-    { icon: <FolderOpenIcon />, name: "Load", onClick: onLoad },
-    { icon: <DeleteIcon />, name: "Clear", onClick: onClear },
+    { icon: <SaveIcon />, name: "Save plan", onClick: onSave },
+    { icon: <FolderOpenIcon />, name: "Load plan", onClick: onLoad },
+    { icon: <LogoutIcon />, name: "Exit session", onClick: onClear, destructive: true },
   ];
 
   const totalMinutes = Math.round((totalDuration || 0) / 60);
+  const statusLabel = {
+    saved: "Saved",
+    saving: "Saving...",
+    unsaved: "Unsaved changes",
+    error: "Save failed",
+  }[persistenceStatus] || "Saved";
 
   return (
-    <AppBar
-      position="static"
-      elevation={0}
-      sx={{
-        backgroundColor: "rgba(5, 6, 10, 0.95)",
-        borderBottom: "1px solid var(--border-subtle)",
-        backdropFilter: "blur(12px)",
-      }}
-    >
+    <AppBar position="static" elevation={0}>
       <Toolbar
         sx={{
           width: "100%",
@@ -77,45 +78,90 @@ export default function Header({
               letterSpacing: 0.4,
             }}
           >
-            Zenn Class Tracker
+            Cadence
           </Typography>
-           <Typography
-             variant="body2"
-             sx={{ color: "var(--text-muted)", fontSize: 12 }}
-           >
-             Plan and run Muay Thai sessions
-           </Typography>
-           <Typography
-             variant="body2"
-             sx={{
-               color: "var(--text-secondary)",
-               fontSize: 12,
-               mt: 0.5,
-               fontVariantNumeric: "tabular-nums",
-             }}
-           >
-             {taskCount} {taskCount === 1 ? "block" : "blocks"} · {totalMinutes} min planned
-           </Typography>
+          <Typography
+            variant="body2"
+            sx={{ color: "var(--text-muted)", fontSize: 12 }}
+          >
+            Build your class
+          </Typography>
+          <Typography
+            variant="body2"
+            sx={{
+              color: "var(--text-secondary)",
+              fontSize: 12,
+              mt: 0.5,
+              fontVariantNumeric: "tabular-nums",
+            }}
+          >
+            {taskCount} {taskCount === 1 ? "block" : "blocks"} · {totalMinutes} min planned
+          </Typography>
+          <Typography
+            variant="body2"
+            role="status"
+            sx={{
+              color: persistenceStatus === "error"
+                ? "var(--accent)"
+                : persistenceStatus === "unsaved"
+                  ? "var(--text-primary)"
+                  : "var(--text-muted)",
+              fontSize: 12,
+              mt: 0.5,
+            }}
+          >
+            {statusLabel}
+            {persistenceError ? `: ${persistenceError}` : ""}
+            {persistenceStatus === "error" ? (
+              <Button
+                onClick={onRetry}
+                size="small"
+                sx={{
+                  minWidth: 0,
+                  ml: 1,
+                  p: 0,
+                  color: "var(--accent)",
+                  textTransform: "none",
+                  textDecoration: "underline",
+                }}
+              >
+                Retry
+              </Button>
+            ) : null}
+          </Typography>
         </div>
 
-        <Stack direction="row" spacing={1} alignItems="center">
+        <Stack
+          direction="row"
+          spacing={1}
+          alignItems="center"
+          flexWrap="wrap"
+          width="100%"
+          justifyContent={{ xs: "flex-start", sm: "flex-end" }}
+        >
           <Button
             variant="contained"
             onClick={handleToggle}
             disabled={!isRunning && !canStart}
             sx={{
-              borderRadius: 999,
+              borderRadius: "var(--radius-pill)",
               px: 2.5,
               py: 0.75,
-              fontWeight: 600,
-              textTransform: "none",
               fontSize: 14,
-              backgroundColor: isRunning
-                ? "#f97316"
-                : "var(--accent-success)",
-              "&:hover": {
-                backgroundColor: isRunning ? "#ea580c" : "#16a34a",
-              },
+              ...(isRunning
+                ? {
+                    backgroundColor: "var(--accent)",
+                    color: "var(--on-accent)",
+                    "&:hover": { backgroundColor: "var(--accent-hover)" },
+                  }
+                : {
+                    backgroundColor: "var(--text-primary)",
+                    color: "var(--app)",
+                    "&:hover": {
+                      backgroundColor: "var(--text-primary)",
+                      opacity: 0.88,
+                    },
+                  }),
             }}
           >
             {isRunning ? "Pause" : "Start"}
@@ -125,14 +171,13 @@ export default function Header({
             variant="outlined"
             onClick={onReset}
             sx={{
-              borderRadius: 999,
-              textTransform: "none",
+              borderRadius: "var(--radius-pill)",
               fontSize: 13,
               borderColor: "var(--border-subtle)",
               color: "var(--text-secondary)",
               "&:hover": {
-                borderColor: "var(--accent-primary)",
-                backgroundColor: "rgba(15,23,42,0.6)",
+                borderColor: "var(--accent)",
+                backgroundColor: "var(--surface)",
               },
             }}
           >
@@ -140,7 +185,7 @@ export default function Header({
           </Button>
 
           <SpeedDial
-            ariaLabel="Save actions"
+            ariaLabel="Planner actions"
             icon={
               <SpeedDialIcon
                 icon={<MenuIcon />}
@@ -153,21 +198,37 @@ export default function Header({
             onClose={() => setOpen(false)}
             FabProps={{
               size: "small",
-              sx: {
-                bgcolor: "#111827",
-                color: "var(--text-secondary)",
-                "&:hover": { bgcolor: "#020617" },
-                boxShadow: "none",
-                ml: 0.5,
-              },
+              sx: { ml: 0.5 },
             }}
           >
             {actions.map((action) => (
               <SpeedDialAction
                 key={action.name}
                 icon={action.icon}
-                tooltipTitle={action.name}
+                aria-label={action.name}
+                FabProps={{
+                  size: "small",
+                  sx: {
+                    backgroundColor: "var(--surface)",
+                    color: action.destructive
+                      ? "var(--accent)"
+                      : "var(--text-secondary)",
+                    border: "1px solid var(--border-subtle)",
+                    "&:hover": {
+                      backgroundColor: "var(--elevated)",
+                      borderColor: action.destructive
+                        ? "var(--accent)"
+                        : "var(--border-subtle)",
+                    },
+                  },
+                }}
                 onClick={() => {
+                  if (
+                    action.destructive &&
+                    !window.confirm("Exit the current planner session?")
+                  ) {
+                    return;
+                  }
                   action.onClick();
                   setOpen(false);
                 }}
