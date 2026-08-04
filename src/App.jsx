@@ -4,6 +4,7 @@ import Timeline from "./components/Timeline";
 import AddTaskForm from "./components/AddTaskForm";
 import Notes from "./components/Notes";
 import LiveClass from "./components/LiveClass";
+import PlannerOverlay from "./components/PlannerOverlay";
 import Login from "./Login";
 import { supabase } from "./supabaseClient";
 
@@ -29,15 +30,17 @@ export default function App() {
   const [isLiveMode, setIsLiveMode] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
   const [isComplete, setIsComplete] = useState(false);
-  const [elapsedTime, setElapsedTime] = useState(0);
-  const [baseElapsed, setBaseElapsed] = useState(0);
+  const [activeTaskId, setActiveTaskId] = useState(null);
+  const [offsetWithinBlock, setOffsetWithinBlock] = useState(0);
+  const [baseOffset, setBaseOffset] = useState(0);
   const [runStartedAt, setRunStartedAt] = useState(null);
   const [transitionTask, setTransitionTask] = useState(null);
   const [selectedTaskId, setSelectedTaskId] = useState(null);
+  const [isPlannerOverlayOpen, setIsPlannerOverlayOpen] = useState(false);
   const [persistenceStatus, setPersistenceStatus] = useState("saved");
   const [persistenceError, setPersistenceError] = useState("");
   const transitionTimer = useRef(null);
-  const previousActiveIndex = useRef(null);
+  const previousActiveTaskId = useRef(null);
   const suppressTransition = useRef(false);
   const persistenceQueue = useRef(Promise.resolve());
   const persistedIdMap = useRef(new Map());
@@ -85,47 +88,23 @@ export default function App() {
     0
   );
 
-  const getCurrentElapsed = () => {
-    if (!isRunning || !runStartedAt) return elapsedTime;
-    return Math.min(
-      totalDuration,
-      baseElapsed + (Date.now() - runStartedAt) / 1000
-    );
-  };
+  const activeIndex = activeTaskId
+    ? tasks.findIndex((task) => task.id === activeTaskId)
+    : -1;
 
-  useEffect(() => {
-    if (!isRunning || !runStartedAt) return undefined;
+  const elapsedBeforeActive =
+    activeIndex >= 0
+      ? tasks
+          .slice(0, activeIndex)
+          .reduce((sum, task) => sum + getDuration(task) * 60, 0)
+      : 0;
 
-    const updateClock = () => {
-      const nextElapsed = Math.min(
-        totalDuration,
-        baseElapsed + (Date.now() - runStartedAt) / 1000
-      );
-      setElapsedTime(nextElapsed);
-
-      if (nextElapsed >= totalDuration) {
-        setElapsedTime(totalDuration);
-        setBaseElapsed(totalDuration);
-        setRunStartedAt(null);
-        setIsRunning(false);
-        setIsComplete(true);
-      }
-    };
-
-    updateClock();
-    const interval = window.setInterval(updateClock, 100);
-    return () => window.clearInterval(interval);
-  }, [baseElapsed, isRunning, runStartedAt, totalDuration]);
-
-  const activeIndex = (() => {
-    let elapsed = 0;
-    return tasks.findIndex((task) => {
-      const end = elapsed + getDuration(task) * 60;
-      const matches = elapsedTime >= elapsed && elapsedTime < end;
-      elapsed = end;
-      return matches;
-    });
+  const liveOffsetWithinBlock = (() => {
+    if (!isRunning || !runStartedAt) return offsetWithinBlock;
+    return baseOffset + (Date.now() - runStartedAt) / 1000;
   })();
+
+  const elapsedTime = elapsedBeforeActive + liveOffsetWithinBlock;
 
   const activeTask = activeIndex >= 0 ? tasks[activeIndex] : null;
   const selectedTask = tasks.find((task) => task.id === selectedTaskId) || null;
@@ -142,37 +121,80 @@ export default function App() {
   }, [selectedTaskId, tasks]);
 
   useEffect(() => {
-    if (activeIndex < 0) {
-      previousActiveIndex.current = activeIndex;
+    if (!isRunning || !runStartedAt || activeTaskId === null) return undefined;
+
+    const updateClock = () => {
+      let liveOffset = baseOffset + (Date.now() - runStartedAt) / 1000;
+      let currentIdx = tasks.findIndex((task) => task.id === activeTaskId);
+
+      // Advance through any block boundaries the live offset overflows.
+      while (currentIdx >= 0 && currentIdx < tasks.length) {
+        const blockDuration = getDuration(tasks[currentIdx]) * 60;
+        if (liveOffset < blockDuration) break;
+
+        const nextIdx = currentIdx + 1;
+        if (nextIdx >= tasks.length) {
+          // Final block completed.
+          setOffsetWithinBlock(blockDuration);
+          setBaseOffset(blockDuration);
+          setRunStartedAt(null);
+          setIsRunning(false);
+          setIsComplete(true);
+          return;
+        }
+        liveOffset -= blockDuration;
+        currentIdx = nextIdx;
+      }
+
+      if (currentIdx < 0 || currentIdx >= tasks.length) return;
+
+      const advancedId = tasks[currentIdx].id;
+      if (advancedId !== activeTaskId) {
+        setActiveTaskId(advancedId);
+      }
+      setOffsetWithinBlock(liveOffset);
+    };
+
+    updateClock();
+    const interval = window.setInterval(updateClock, 100);
+    return () => window.clearInterval(interval);
+  }, [
+    activeTaskId,
+    baseOffset,
+    isRunning,
+    runStartedAt,
+    tasks,
+    totalDuration,
+  ]);
+
+  useEffect(() => {
+    if (activeTaskId === null) {
+      previousActiveTaskId.current = null;
       return undefined;
     }
 
-    const previousIndex = previousActiveIndex.current;
+    const previousId = previousActiveTaskId.current;
     if (
-      previousIndex !== null &&
-      activeIndex > previousIndex &&
+      previousId !== null &&
+      activeTaskId !== previousId &&
       isRunning &&
       !suppressTransition.current
     ) {
-      setTransitionTask(tasks[activeIndex]);
-      window.clearTimeout(transitionTimer.current);
-      transitionTimer.current = window.setTimeout(() => {
-        setTransitionTask(null);
-      }, 1800);
+      const task = tasks.find((item) => item.id === activeTaskId);
+      if (task) {
+        setTransitionTask(task);
+        window.clearTimeout(transitionTimer.current);
+        transitionTimer.current = window.setTimeout(() => {
+          setTransitionTask(null);
+        }, 1800);
+      }
     }
 
     suppressTransition.current = false;
-    previousActiveIndex.current = activeIndex;
+    previousActiveTaskId.current = activeTaskId;
 
     return () => window.clearTimeout(transitionTimer.current);
-  }, [activeIndex, isRunning, tasks]);
-
-  useEffect(() => {
-    if (elapsedTime > totalDuration) {
-      setElapsedTime(totalDuration);
-      setBaseElapsed(totalDuration);
-    }
-  }, [elapsedTime, totalDuration]);
+  }, [activeTaskId, isRunning, tasks]);
 
   const fetchTasks = async () => {
     const { data, error } = await supabase
@@ -272,11 +294,136 @@ export default function App() {
     return normalizeTasks(persistedTasks);
   };
 
+  const classifyRunEdit = (previousTasks, nextTasks) => {
+    if (!isRunning || activeTaskId === null) {
+      return { requiresConfirm: false };
+    }
+
+    const activeIdx = previousTasks.findIndex((t) => t.id === activeTaskId);
+    if (activeIdx < 0) return { requiresConfirm: false };
+
+    const nextIds = new Set(nextTasks.map((t) => t.id));
+
+    const deleted = previousTasks.filter((t) => !nextIds.has(t.id));
+    if (deleted.some((t) => t.id === activeTaskId)) {
+      return {
+        requiresConfirm: true,
+        kind: "delete-active",
+        message:
+          "Delete the active block? The run will advance to the next block.",
+      };
+    }
+    if (
+      deleted.some((t) => {
+        const idx = previousTasks.findIndex((p) => p.id === t.id);
+        return idx >= 0 && idx < activeIdx;
+      })
+    ) {
+      return {
+        requiresConfirm: true,
+        kind: "delete-past",
+        message:
+          "Delete a block the run has already passed? This cannot be undone.",
+      };
+    }
+
+    const activePrev = previousTasks[activeIdx];
+    const activeNext = nextTasks.find((t) => t.id === activeTaskId);
+    if (
+      activeNext &&
+      Number(activePrev.duration) !== Number(activeNext.duration)
+    ) {
+      const newDurationSec = Number(activeNext.duration) * 60;
+      if (offsetWithinBlock > newDurationSec) {
+        return {
+          requiresConfirm: true,
+          kind: "active-duration-below-offset",
+          message:
+            "Shorten the active block below the time already elapsed? The run will advance.",
+        };
+      }
+      return {
+        requiresConfirm: true,
+        kind: "active-duration",
+        message:
+          "Change the active block's duration? Its remaining countdown will update.",
+      };
+    }
+
+    const nextPosById = new Map(nextTasks.map((t, i) => [t.id, i]));
+    if (
+      nextPosById.has(activeTaskId) &&
+      nextPosById.get(activeTaskId) !== activeIdx
+    ) {
+      return {
+        requiresConfirm: true,
+        kind: "reorder-active",
+        message: "Move the active block? The run position will follow it.",
+      };
+    }
+    const pastMoved = previousTasks.some((t, i) => {
+      if (i >= activeIdx) return false;
+      const newPos = nextPosById.get(t.id);
+      return newPos !== undefined && newPos !== i;
+    });
+    if (pastMoved) {
+      return {
+        requiresConfirm: true,
+        kind: "reorder-past",
+        message: "Reorder a block the run has already passed?",
+      };
+    }
+
+    return { requiresConfirm: false };
+  };
+
+  const advanceActiveTo = (nextTasks, fallbackIndex) => {
+    const successor =
+      nextTasks[Math.min(fallbackIndex, nextTasks.length - 1)] || null;
+    if (successor) {
+      suppressTransition.current = true;
+      setActiveTaskId(successor.id);
+      setOffsetWithinBlock(0);
+      setBaseOffset(0);
+      previousActiveTaskId.current = successor.id;
+      if (runStartedAt) setRunStartedAt(Date.now());
+    } else {
+      setIsRunning(false);
+      setRunStartedAt(null);
+      setIsComplete(true);
+      setActiveTaskId(null);
+    }
+  };
+
   const commitPlan = (nextTasks, previousTasks = tasks) => {
+    if (isRunning) {
+      const classification = classifyRunEdit(previousTasks, nextTasks);
+      if (classification.requiresConfirm && !window.confirm(classification.message)) {
+        return Promise.resolve(previousTasks);
+      }
+    }
+
     const normalizedTasks = normalizeTasks(nextTasks);
     const revision = ++planRevision.current;
     setTasks(normalizedTasks);
     setPersistenceError("");
+
+    if (isRunning && activeTaskId !== null) {
+      const stillPresent = normalizedTasks.some((t) => t.id === activeTaskId);
+      if (!stillPresent) {
+        const previousIdx = previousTasks.findIndex((t) => t.id === activeTaskId);
+        advanceActiveTo(normalizedTasks, previousIdx);
+      } else {
+        const updatedActive = normalizedTasks.find((t) => t.id === activeTaskId);
+        const newDurationSec = getDuration(updatedActive) * 60;
+        if (newDurationSec > 0 && offsetWithinBlock >= newDurationSec) {
+          const currentIdx = normalizedTasks.findIndex(
+            (t) => t.id === activeTaskId
+          );
+          advanceActiveTo(normalizedTasks, currentIdx + 1);
+        }
+      }
+    }
 
     if (!session) {
       setPersistenceStatus("unsaved");
@@ -322,7 +469,11 @@ export default function App() {
 
   const deleteTask = (id) => {
     const task = tasks.find((item) => item.id === id);
-    if (task && !window.confirm(`Delete “${task.name}”?`)) return;
+    if (!task) return;
+    // During a run the run-aware guard in commitPlan supplies the consequence-
+    // aware confirmation, so skip the generic by-name prompt to avoid double-
+    // prompting. Off-run, the by-name prompt is still the gate.
+    if (!isRunning && !window.confirm(`Delete “${task.name}”?`)) return;
 
     commitPlan(tasks.filter((item) => item.id !== id));
   };
@@ -357,28 +508,46 @@ export default function App() {
 
   const startClass = () => {
     if (!tasks.length || totalDuration <= 0) return;
-    const startAt = isComplete || elapsedTime >= totalDuration ? 0 : elapsedTime;
-    setElapsedTime(startAt);
-    setBaseElapsed(startAt);
+
+    let startTaskId;
+    let startOffset;
+    if (isComplete || activeTaskId === null) {
+      startTaskId = tasks[0].id;
+      startOffset = 0;
+    } else {
+      startTaskId = tasks.some((task) => task.id === activeTaskId)
+        ? activeTaskId
+        : tasks[0].id;
+      startOffset = offsetWithinBlock;
+    }
+
+    setActiveTaskId(startTaskId);
+    setOffsetWithinBlock(startOffset);
+    setBaseOffset(startOffset);
     setIsComplete(false);
     setIsLiveMode(true);
     setIsRunning(true);
     setRunStartedAt(Date.now());
-    previousActiveIndex.current = startAt === 0 ? 0 : activeIndex;
+    previousActiveTaskId.current = startTaskId;
   };
 
   const pauseClass = () => {
     if (!isRunning) return;
-    const currentElapsed = getCurrentElapsed();
-    setElapsedTime(currentElapsed);
-    setBaseElapsed(currentElapsed);
+    const liveOffset = runStartedAt
+      ? baseOffset + (Date.now() - runStartedAt) / 1000
+      : offsetWithinBlock;
+    const activeBlock = tasks.find((task) => task.id === activeTaskId);
+    const blockDuration = activeBlock ? getDuration(activeBlock) * 60 : 0;
+    const clampedOffset = Math.max(0, Math.min(liveOffset, blockDuration));
+    setOffsetWithinBlock(clampedOffset);
+    setBaseOffset(clampedOffset);
     setRunStartedAt(null);
     setIsRunning(false);
   };
 
   const resumeClass = () => {
     if (isComplete || !tasks.length || totalDuration <= 0) return;
-    setBaseElapsed(elapsedTime);
+    setBaseOffset(offsetWithinBlock);
     setRunStartedAt(Date.now());
     setIsRunning(true);
   };
@@ -386,25 +555,24 @@ export default function App() {
   const resetClass = () => {
     setIsRunning(false);
     setRunStartedAt(null);
-    setElapsedTime(0);
-    setBaseElapsed(0);
+    setActiveTaskId(tasks.length ? tasks[0].id : null);
+    setOffsetWithinBlock(0);
+    setBaseOffset(0);
     setIsComplete(false);
     setTransitionTask(null);
-    previousActiveIndex.current = 0;
+    previousActiveTaskId.current = tasks.length ? tasks[0].id : null;
   };
 
   const moveToBlock = (targetIndex) => {
     if (targetIndex < 0 || targetIndex >= tasks.length) return;
 
-    const targetElapsed = tasks
-      .slice(0, targetIndex)
-      .reduce((sum, task) => sum + getDuration(task) * 60, 0);
     suppressTransition.current = true;
     setTransitionTask(null);
-    setElapsedTime(targetElapsed);
-    setBaseElapsed(targetElapsed);
+    setActiveTaskId(tasks[targetIndex].id);
+    setOffsetWithinBlock(0);
+    setBaseOffset(0);
     setIsComplete(false);
-    previousActiveIndex.current = targetIndex;
+    previousActiveTaskId.current = tasks[targetIndex].id;
     if (isRunning) setRunStartedAt(Date.now());
   };
 
@@ -415,40 +583,28 @@ export default function App() {
     setIsRunning(false);
     setRunStartedAt(null);
     setIsLiveMode(false);
+    setIsPlannerOverlayOpen(false);
     setTransitionTask(null);
   };
+
+  const openPlannerOverlay = () => {
+    if (activeTaskId !== null) setSelectedTaskId(activeTaskId);
+    setIsPlannerOverlayOpen(true);
+  };
+
+  const closePlannerOverlay = () => setIsPlannerOverlayOpen(false);
 
   if (!session && !guestMode) {
     return <Login onGuest={() => setGuestMode(true)} />;
   }
 
-  if (isLiveMode) {
-    return (
-      <LiveClass
-        tasks={tasks}
-        activeTask={activeTask}
-        activeIndex={activeIndex}
-        elapsedTime={elapsedTime}
-        totalDuration={totalDuration}
-        isRunning={isRunning}
-        isComplete={isComplete}
-        transitionTask={transitionTask}
+  const renderPlanner = () => (
+    <>
+      <Header
+        onStart={startClass}
         onPause={pauseClass}
         onResume={resumeClass}
         onReset={resetClass}
-        onPrevious={movePrevious}
-        onNext={moveNext}
-        onExit={exitLiveMode}
-      />
-    );
-  }
-
-  return (
-    <div className="app-shell">
-      <Header
-          onStart={startClass}
-          onPause={pauseClass}
-          onReset={resetClass}
         onSave={savePlan}
         onLoad={loadPlan}
         onRetry={retryPersistence}
@@ -459,6 +615,7 @@ export default function App() {
           else setGuestMode(false);
         }}
         isRunning={isRunning}
+        isLiveMode={isLiveMode}
         taskCount={tasks.length}
         totalDuration={totalDuration}
         canStart={tasks.length > 0 && totalDuration > 0}
@@ -471,11 +628,14 @@ export default function App() {
             onReorder={(nextTasks) => commitPlan(nextTasks)}
             onSelectTask={(task) => setSelectedTaskId(task.id)}
             selectedTask={selectedTask}
+            isRunning={isRunning}
+            activeTaskId={activeTaskId}
+            elapsedTime={elapsedTime}
           />
         </div>
         <div className="builder-notes">
           <Notes
-            task={isRunning ? activeTask : selectedTask || activeTask || null}
+            task={selectedTask || activeTask || null}
             onUpdateTask={updateTask}
             onDeleteTask={deleteTask}
           />
@@ -484,6 +644,40 @@ export default function App() {
           <AddTaskForm onAdd={addTask} />
         </div>
       </div>
-    </div>
+    </>
   );
+
+  if (isLiveMode) {
+    return (
+      <div className="live-root">
+        <LiveClass
+          tasks={tasks}
+          activeTask={activeTask}
+          activeIndex={activeIndex}
+          elapsedTime={elapsedTime}
+          totalDuration={totalDuration}
+          isRunning={isRunning}
+          isComplete={isComplete}
+          transitionTask={transitionTask}
+          onPause={pauseClass}
+          onResume={resumeClass}
+          onReset={resetClass}
+          onPrevious={movePrevious}
+          onNext={moveNext}
+          onExit={exitLiveMode}
+          onEditPlan={openPlannerOverlay}
+        />
+        {isPlannerOverlayOpen && (
+          <PlannerOverlay
+            onClose={closePlannerOverlay}
+            classRemainingSeconds={Math.max(0, totalDuration - elapsedTime)}
+          >
+            {renderPlanner()}
+          </PlannerOverlay>
+        )}
+      </div>
+    );
+  }
+
+  return <div className="app-shell">{renderPlanner()}</div>;
 }

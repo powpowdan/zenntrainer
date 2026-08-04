@@ -6,6 +6,7 @@ export default function TaskBlock({
   height,
   onSelect,
   selected,
+  active = false,
 }) {
   return (
     <Box
@@ -19,15 +20,20 @@ export default function TaskBlock({
       role="button"
       tabIndex={0}
       aria-pressed={selected}
-      aria-label={`${sequence}. ${task.name}, ${task.duration} minutes${selected ? ", selected" : ""}`}
+      aria-current={active ? "step" : undefined}
+      aria-label={`${sequence}. ${task.name}, ${task.duration} minutes${active ? ", active" : ""}${selected ? ", selected" : ""}`}
       sx={{
         width: "100%",
         minWidth: 0,
         minHeight: 64,
         height: `${height}px`,
-        backgroundColor: selected ? "var(--elevated)" : "var(--surface)",
+        backgroundColor: selected
+          ? "var(--elevated)"
+          : active
+          ? "color-mix(in srgb, var(--accent) 9%, var(--surface))"
+          : "var(--surface)",
         border: "1px solid var(--border-subtle)",
-        borderLeft: "3px solid var(--border-subtle)",
+        borderLeft: `3px solid ${active ? "var(--accent)" : "var(--border-subtle)"}`,
         borderRadius: "var(--radius-sm)",
         display: "flex",
         alignItems: "center",
@@ -35,12 +41,14 @@ export default function TaskBlock({
         padding: "0 12px",
         color: "var(--text-primary)",
         cursor: "grab",
-        fontSize: selected ? "15px" : "14px",
-        fontWeight: selected ? 600 : 500,
+        fontSize: selected || active ? "15px" : "14px",
+        fontWeight: selected || active ? 600 : 500,
         letterSpacing: "0.3px",
         userSelect: "none",
         boxShadow: selected
           ? "0 0 12px color-mix(in srgb, var(--accent) 22%, transparent)"
+          : active
+          ? "0 0 8px color-mix(in srgb, var(--accent) 14%, transparent)"
           : "0 1px 3px rgba(0, 0, 0, 0.4)",
         outline: selected ? "2px solid var(--accent)" : undefined,
         outlineOffset: selected ? "2px" : undefined,
@@ -75,7 +83,7 @@ export default function TaskBlock({
           </Box>
         </Box>
         <span className="task-block-state" aria-hidden="true">
-          {selected ? "Selected" : ""}
+          {selected ? "Selected" : active ? "Active" : ""}
         </span>
         {task.plan ? (
           <Box

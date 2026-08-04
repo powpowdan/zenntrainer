@@ -8,9 +8,14 @@ export default function Timeline({
   onReorder,
   onSelectTask,
   selectedTask,
+  isRunning = false,
+  activeTaskId = null,
+  elapsedTime = 0,
 }) {
   const PIXELS_PER_MINUTE = 6;
   const MIN_BLOCK_HEIGHT = 64;
+  const PADDING_TOP = 8;
+  const BLOCK_MARGIN_BOTTOM = 6;
   const [isDragging, setIsDragging] = useState(false);
 
   const getBlockHeight = (task) =>
@@ -20,6 +25,12 @@ export default function Timeline({
     ...task,
     taskHeight: getBlockHeight(task),
   }));
+
+  // Vertical offset of the playhead within the scrollable timeline content,
+  // measured from the top of the timeline padding. 1 minute of class time =
+  // PIXELS_PER_MINUTE px, so elapsedTime (seconds) maps to (elapsedTime/60) * PPM.
+  const progressLineTop =
+    PADDING_TOP + (elapsedTime / 60) * PIXELS_PER_MINUTE;
 
   const handleDragEnd = (result) => {
     setIsDragging(false);
@@ -70,6 +81,14 @@ export default function Timeline({
               </div>
             ) : null}
 
+            {isRunning && tasks.length > 0 && (
+              <div
+                className="timeline-progress-line"
+                aria-hidden="true"
+                style={{ top: `${progressLineTop}px` }}
+              />
+            )}
+
             {tasksWithHeight.map((task, index) => {
               return (
                 <Draggable
@@ -101,6 +120,7 @@ export default function Timeline({
                         height={task.taskHeight}
                         onDelete={onDelete}
                         selected={selectedTask && selectedTask.id === task.id}
+                        active={isRunning && task.id === activeTaskId}
                         onSelect={() => onSelectTask(task)}
                       />
                     </div>
@@ -133,7 +153,7 @@ export default function Timeline({
                 : "var(--text-primary)",
               textAlign: "center",
               fontSize: 16,
-              zIndex: 1000,
+              zIndex: 1300,
               opacity: isDragging ? 1 : 0,
               pointerEvents: isDragging ? "auto" : "none",
               transition:

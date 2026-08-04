@@ -36,7 +36,7 @@ export default function Login({ onGuest }) {
         variant="h4"
         sx={{ fontWeight: 700, letterSpacing: "-0.03em", mb: 3 }}
       >
-        Cadence
+        Cadence<Box component="span" sx={{ color: "var(--accent)" }}>.</Box>
       </Typography>
       <Box
         component="form"

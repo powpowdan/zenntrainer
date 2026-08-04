@@ -22,6 +22,7 @@ export default function LiveClass({
   onPrevious,
   onNext,
   onExit,
+  onEditPlan,
 }) {
   const startOffset = tasks
     .slice(0, Math.max(activeIndex, 0))
@@ -74,9 +75,16 @@ export default function LiveClass({
           <span className="live-kicker">Live class</span>
           <h1>Class in progress</h1>
         </div>
-        <button className="live-text-button" onClick={onExit}>
-          Exit
-        </button>
+        <div className="live-header-actions">
+          {onEditPlan && (
+            <button className="live-text-button" onClick={onEditPlan}>
+              Edit plan
+            </button>
+          )}
+          <button className="live-text-button" onClick={onExit}>
+            Exit
+          </button>
+        </div>
       </header>
 
       <section className="live-class-clock" aria-label="Class remaining">

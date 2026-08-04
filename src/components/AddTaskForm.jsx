@@ -87,7 +87,7 @@ export default function AddTaskForm({ onAdd }) {
       style={{
         position: "fixed",
         inset: 0,
-        zIndex: 40,
+        zIndex: 1300,
         display: "flex",
         alignItems: "flex-end",
         justifyContent: "center",

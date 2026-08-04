@@ -1,5 +1,6 @@
 import React from "react";
 import {
+  Box,
   Button,
   Stack,
   Typography,
@@ -18,12 +19,14 @@ import CloseIcon from "@mui/icons-material/Close";
 export default function Header({
   onStart,
   onPause,
+  onResume,
   onReset,
   onSave,
   onLoad,
   onRetry,
   onClear,
   isRunning,
+  isLiveMode,
   taskCount,
   totalDuration,
   canStart,
@@ -35,6 +38,8 @@ export default function Header({
   const handleToggle = () => {
     if (isRunning) {
       onPause();
+    } else if (isLiveMode) {
+      onResume();
     } else {
       onStart();
     }
@@ -78,7 +83,7 @@ export default function Header({
               letterSpacing: 0.4,
             }}
           >
-            Cadence
+            Cadence<Box component="span" sx={{ color: "var(--accent)" }}>.</Box>
           </Typography>
           <Typography
             variant="body2"
@@ -164,7 +169,7 @@ export default function Header({
                   }),
             }}
           >
-            {isRunning ? "Pause" : "Start"}
+            {isRunning ? "Pause" : isLiveMode ? "Resume" : "Start"}
           </Button>
 
           <Button
