@@ -1,3 +1,6 @@
+import { IconButton } from "@mui/material";
+import { VolumeOff, VolumeUp } from "@mui/icons-material";
+
 const formatTime = (seconds) => {
   const safeSeconds = Math.max(0, Math.ceil(seconds));
   const minutes = Math.floor(safeSeconds / 60);
@@ -23,6 +26,8 @@ export default function LiveClass({
   onNext,
   onExit,
   onEditPlan,
+  isMuted = false,
+  onToggleMute,
 }) {
   const startOffset = tasks
     .slice(0, Math.max(activeIndex, 0))
@@ -76,6 +81,17 @@ export default function LiveClass({
           <h1>Class in progress</h1>
         </div>
         <div className="live-header-actions">
+          {onToggleMute && (
+            <IconButton
+              onClick={onToggleMute}
+              aria-label={isMuted ? "Unmute class sounds" : "Mute class sounds"}
+              aria-pressed={isMuted}
+              size="small"
+              sx={{ color: "var(--text-secondary)" }}
+            >
+              {isMuted ? <VolumeOff /> : <VolumeUp />}
+            </IconButton>
+          )}
           {onEditPlan && (
             <button className="live-text-button" onClick={onEditPlan}>
               Edit plan

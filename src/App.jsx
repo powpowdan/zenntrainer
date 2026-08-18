@@ -7,6 +7,7 @@ import LiveClass from "./components/LiveClass";
 import PlannerOverlay from "./components/PlannerOverlay";
 import Login from "./Login";
 import { supabase } from "./supabaseClient";
+import { unlockAudio, playBell } from "./sound";
 
 const getDuration = (task) => Number(task.duration) || 0;
 
@@ -37,11 +38,15 @@ export default function App() {
   const [transitionTask, setTransitionTask] = useState(null);
   const [selectedTaskId, setSelectedTaskId] = useState(null);
   const [isPlannerOverlayOpen, setIsPlannerOverlayOpen] = useState(false);
+  const [isMuted, setIsMuted] = useState(
+    () => localStorage.getItem("liveSoundMuted") === "true"
+  );
   const [persistenceStatus, setPersistenceStatus] = useState("saved");
   const [persistenceError, setPersistenceError] = useState("");
   const transitionTimer = useRef(null);
   const previousActiveTaskId = useRef(null);
   const suppressTransition = useRef(false);
+  const completionBellPlayed = useRef(false);
   const persistenceQueue = useRef(Promise.resolve());
   const persistedIdMap = useRef(new Map());
   const planRevision = useRef(0);
@@ -140,6 +145,10 @@ export default function App() {
           setRunStartedAt(null);
           setIsRunning(false);
           setIsComplete(true);
+          if (!completionBellPlayed.current) {
+            completionBellPlayed.current = true;
+            playBell(isMuted);
+          }
           return;
         }
         liveOffset -= blockDuration;
@@ -162,6 +171,7 @@ export default function App() {
     activeTaskId,
     baseOffset,
     isRunning,
+    isMuted,
     runStartedAt,
     tasks,
     totalDuration,
@@ -183,6 +193,7 @@ export default function App() {
       const task = tasks.find((item) => item.id === activeTaskId);
       if (task) {
         setTransitionTask(task);
+        playBell(isMuted);
         window.clearTimeout(transitionTimer.current);
         transitionTimer.current = window.setTimeout(() => {
           setTransitionTask(null);
@@ -194,7 +205,7 @@ export default function App() {
     previousActiveTaskId.current = activeTaskId;
 
     return () => window.clearTimeout(transitionTimer.current);
-  }, [activeTaskId, isRunning, tasks]);
+  }, [activeTaskId, isRunning, isMuted, tasks]);
 
   const fetchTasks = async () => {
     const { data, error } = await supabase
@@ -528,7 +539,9 @@ export default function App() {
     setIsLiveMode(true);
     setIsRunning(true);
     setRunStartedAt(Date.now());
+    completionBellPlayed.current = false;
     previousActiveTaskId.current = startTaskId;
+    unlockAudio();
   };
 
   const pauseClass = () => {
@@ -547,6 +560,7 @@ export default function App() {
 
   const resumeClass = () => {
     if (isComplete || !tasks.length || totalDuration <= 0) return;
+    unlockAudio();
     setBaseOffset(offsetWithinBlock);
     setRunStartedAt(Date.now());
     setIsRunning(true);
@@ -560,6 +574,7 @@ export default function App() {
     setBaseOffset(0);
     setIsComplete(false);
     setTransitionTask(null);
+    completionBellPlayed.current = false;
     previousActiveTaskId.current = tasks.length ? tasks[0].id : null;
   };
 
@@ -578,6 +593,14 @@ export default function App() {
 
   const moveNext = () => moveToBlock(activeIndex + 1);
   const movePrevious = () => moveToBlock(activeIndex - 1);
+
+  const toggleMute = () => {
+    setIsMuted((previous) => {
+      const next = !previous;
+      localStorage.setItem("liveSoundMuted", String(next));
+      return next;
+    });
+  };
 
   const exitLiveMode = () => {
     setIsRunning(false);
@@ -631,6 +654,7 @@ export default function App() {
             isRunning={isRunning}
             activeTaskId={activeTaskId}
             elapsedTime={elapsedTime}
+            showRunPosition={isLiveMode && !isComplete && activeTaskId !== null}
           />
         </div>
         <div className="builder-notes">
@@ -666,6 +690,8 @@ export default function App() {
           onNext={moveNext}
           onExit={exitLiveMode}
           onEditPlan={openPlannerOverlay}
+          isMuted={isMuted}
+          onToggleMute={toggleMute}
         />
         {isPlannerOverlayOpen && (
           <PlannerOverlay

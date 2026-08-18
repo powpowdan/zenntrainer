@@ -2,6 +2,16 @@ import TaskBlock from "./TaskBlock";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import { useState } from "react";
 
+const PIXELS_PER_MINUTE = 6;
+const MIN_BLOCK_HEIGHT = 64;
+const PADDING_TOP = 8;
+const BLOCK_MARGIN_BOTTOM = 6;
+
+const getDuration = (task) => Number(task.duration) || 0;
+
+const getBlockHeight = (task) =>
+  Math.max(getDuration(task) * PIXELS_PER_MINUTE, MIN_BLOCK_HEIGHT);
+
 export default function Timeline({
   tasks,
   onDelete,
@@ -11,15 +21,9 @@ export default function Timeline({
   isRunning = false,
   activeTaskId = null,
   elapsedTime = 0,
+  showRunPosition = false,
 }) {
-  const PIXELS_PER_MINUTE = 6;
-  const MIN_BLOCK_HEIGHT = 64;
-  const PADDING_TOP = 8;
-  const BLOCK_MARGIN_BOTTOM = 6;
   const [isDragging, setIsDragging] = useState(false);
-
-  const getBlockHeight = (task) =>
-    Math.max(Number(task.duration || 0) * PIXELS_PER_MINUTE, MIN_BLOCK_HEIGHT);
 
   const tasksWithHeight = tasks.map((task) => ({
     ...task,
@@ -27,10 +31,38 @@ export default function Timeline({
   }));
 
   // Vertical offset of the playhead within the scrollable timeline content,
-  // measured from the top of the timeline padding. 1 minute of class time =
-  // PIXELS_PER_MINUTE px, so elapsedTime (seconds) maps to (elapsedTime/60) * PPM.
-  const progressLineTop =
-    PADDING_TOP + (elapsedTime / 60) * PIXELS_PER_MINUTE;
+  // derived from the rendered block layout: stacked rendered heights (min
+  // heights included) plus margins of all preceding blocks, plus a
+  // duration-proportional fraction of the active block's rendered height.
+  const activeIndex = activeTaskId
+    ? tasks.findIndex((task) => task.id === activeTaskId)
+    : -1;
+
+  const progressLineTop = (() => {
+    if (activeIndex < 0) return null;
+
+    const plannedBeforeActive = tasks
+      .slice(0, activeIndex)
+      .reduce((sum, task) => sum + getDuration(task) * 60, 0);
+    const activeDurationSec = getDuration(tasks[activeIndex]) * 60;
+    const offsetWithinBlock = elapsedTime - plannedBeforeActive;
+    const fraction =
+      activeDurationSec > 0
+        ? Math.max(0, Math.min(1, offsetWithinBlock / activeDurationSec))
+        : 0;
+    const renderedBeforeActive = tasks
+      .slice(0, activeIndex)
+      .reduce(
+        (sum, task) => sum + getBlockHeight(task) + BLOCK_MARGIN_BOTTOM,
+        0
+      );
+
+    return (
+      PADDING_TOP +
+      renderedBeforeActive +
+      fraction * getBlockHeight(tasks[activeIndex])
+    );
+  })();
 
   const handleDragEnd = (result) => {
     setIsDragging(false);
@@ -65,7 +97,7 @@ export default function Timeline({
               height: "100%",
               overflowY: "auto",
               background: "var(--surface)",
-              padding: "8px 10px",
+              padding: `${PADDING_TOP}px 10px`,
               borderRadius: "var(--radius-md) var(--radius-md) 0 0",
               borderTop: "1px solid var(--border-subtle)",
             }}
@@ -81,7 +113,7 @@ export default function Timeline({
               </div>
             ) : null}
 
-            {isRunning && tasks.length > 0 && (
+            {showRunPosition && !isDragging && tasks.length > 0 && (
               <div
                 className="timeline-progress-line"
                 aria-hidden="true"
@@ -110,7 +142,7 @@ export default function Timeline({
                           ? "0 10px 30px rgba(0, 0, 0, 0.9)"
                           : "0 1px 4px rgba(0, 0, 0, 0.45)",
                         borderRadius: "var(--radius-sm)",
-                        marginBottom: "6px",
+                        marginBottom: `${BLOCK_MARGIN_BOTTOM}px`,
                         touchAction: "pan-y",
                       }}
                     >
