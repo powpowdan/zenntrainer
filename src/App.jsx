@@ -9,6 +9,7 @@ import LibraryModal from "./components/LibraryModal";
 import ShareDialog from "./components/ShareDialog";
 import ImportDialog from "./components/ImportDialog";
 import Login from "./Login";
+import SetPassword from "./SetPassword";
 import { supabase } from "./supabaseClient";
 import { unlockAudio, playBell } from "./sound";
 import * as guestStore from "./classStorage";
@@ -93,6 +94,7 @@ const guestTaskSummaries = (data) => {
 export default function App() {
   const [session, setSession] = useState(null);
   const [guestMode, setGuestMode] = useState(false);
+  const [passwordRecovery, setPasswordRecovery] = useState(false);
   const [classes, setClasses] = useState([]);
   const [currentClassId, setCurrentClassId] = useState(null);
   const [runsByClass, setRunsByClass] = useState({});
@@ -132,8 +134,9 @@ export default function App() {
   const importedShareTokenRef = useRef(null);
 
   // Capture a share token from ?s= at first load, strip it from the URL so a
-  // refresh never re-opens the import, and stash it for the magic-link
-  // round trip (which reloads the page without the param).
+  // refresh never re-opens the import, and stash it so it survives the
+  // auth round trips (the password-reset recovery link reloads the page
+  // without the param; password sign-in does not reload at all).
   useEffect(() => {
     const fromUrl = new URLSearchParams(window.location.search).get("s");
     if (fromUrl) {
@@ -154,9 +157,10 @@ export default function App() {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, currentSession) => {
+    } = supabase.auth.onAuthStateChange((event, currentSession) => {
       setSession(currentSession);
       if (currentSession) setGuestMode(false);
+      if (event === "PASSWORD_RECOVERY") setPasswordRecovery(true);
     });
 
     return () => subscription.unsubscribe();
@@ -1217,6 +1221,10 @@ export default function App() {
     if (session) supabase.auth.signOut();
     else setGuestMode(false);
   };
+
+  if (passwordRecovery) {
+    return <SetPassword onDone={() => setPasswordRecovery(false)} />;
+  }
 
   if (!session && !guestMode) {
     return <Login onGuest={() => setGuestMode(true)} />;
