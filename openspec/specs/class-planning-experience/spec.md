@@ -56,15 +56,19 @@ The system SHALL identify the selected block consistently across the timeline an
 
 ### Requirement: Plan mutations provide reliable persistence feedback
 
-The system SHALL persist additions, edits, deletions, and reorder operations through the same persistence behavior used by the current guest and authenticated modes. For authenticated plans, each block's persisted position SHALL be unique within its user's plan and SHALL be restored when the plan is loaded again. The planner SHALL communicate whether the current plan is saved, saving, or has unsaved changes, and a failed persistence operation SHALL not silently discard the coach's visible edits.
+The system SHALL persist additions, edits, deletions, and reorder operations automatically for both guest and authenticated coaches, without requiring a manual save action. For authenticated plans, each block's persisted position SHALL be unique within its class and SHALL be restored when that class is loaded again. The planner SHALL communicate whether the current class is saved, saving, or has unsaved changes, and a failed persistence operation SHALL NOT silently discard the coach's visible edits.
 
 #### Scenario: Coach changes a plan successfully
 - **WHEN** the coach adds, edits, deletes, or reorders a block and persistence succeeds
-- **THEN** the system shows that the current plan is saved
+- **THEN** the system shows that the current class is saved
 
 #### Scenario: Authenticated coach reloads a reordered plan
-- **WHEN** an authenticated coach reorders blocks, the mutation succeeds, and the plan is loaded again
-- **THEN** the blocks return in the saved order with unique positions within that user's plan
+- **WHEN** an authenticated coach reorders blocks, the mutation succeeds, and the class is loaded again
+- **THEN** the blocks return in the saved order with unique positions within that class
+
+#### Scenario: Coach edits without saving manually
+- **WHEN** the coach edits a block and takes no save action
+- **THEN** the change is persisted automatically for both guest and authenticated coaches
 
 #### Scenario: Coach has changes awaiting persistence
 - **WHEN** the visible plan differs from the last persisted plan
