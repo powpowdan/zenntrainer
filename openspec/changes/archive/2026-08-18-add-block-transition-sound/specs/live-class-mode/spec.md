@@ -5,7 +5,7 @@
 
 ## MODIFIED Requirements
 
-### Requirement: Blocks advance automatically with a non-blocking transition
+### Requirement: Blocks advance automatically with a visual-only transition
 
 The system SHALL automatically make the next block active when the current block reaches zero. At the boundary, the system SHALL show a short, non-blocking visual transition identifying the next block and SHALL play an audible cue. The transition SHALL NOT add time to the planned class duration or prevent the coach from using live controls. The audible cue SHALL play only when the active block changes through natural time progression — including boundaries crossed while the planner overlay is open — and SHALL NOT play when the change results from manual navigation or from a plan edit forcing the run to advance.
 

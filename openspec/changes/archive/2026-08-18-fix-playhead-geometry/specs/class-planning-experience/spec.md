@@ -20,6 +20,6 @@ The system SHALL make each block's name, sequence, and duration readable even fo
 - **WHEN** the coach pauses during a live class and the planner is open
 - **THEN** the progress line remains visible at the paused position instead of disappearing, and resumes advancing when the coach resumes the class
 
-#### Scenario: Planner suppresses run state when no live session is in progress
+#### Scenario: Planner suppresses run state when no class is running
 - **WHEN** the coach opens the planner and no live class session is in progress, including immediately after leaving a live class that has been paused or completed
 - **THEN** the planner shows no progress line and no active-block highlight, while any internally-held elapsed time is preserved so a paused class can still be resumed
