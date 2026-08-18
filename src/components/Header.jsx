@@ -1,4 +1,3 @@
-import React from "react";
 import {
   Box,
   Button,
@@ -6,25 +5,20 @@ import {
   Typography,
   AppBar,
   Toolbar,
-  SpeedDial,
-  SpeedDialAction,
-  SpeedDialIcon,
+  IconButton,
 } from "@mui/material";
-import SaveIcon from "@mui/icons-material/Save";
-import FolderOpenIcon from "@mui/icons-material/FolderOpen";
 import LogoutIcon from "@mui/icons-material/Logout";
-import MenuIcon from "@mui/icons-material/Menu";
-import CloseIcon from "@mui/icons-material/Close";
+import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 
 export default function Header({
   onStart,
   onPause,
   onResume,
   onReset,
-  onSave,
-  onLoad,
+  onExit,
   onRetry,
-  onClear,
+  onOpenLibrary,
+  className,
   isRunning,
   isLiveMode,
   taskCount,
@@ -33,8 +27,6 @@ export default function Header({
   persistenceStatus,
   persistenceError,
 }) {
-  const [open, setOpen] = React.useState(false);
-
   const handleToggle = () => {
     if (isRunning) {
       onPause();
@@ -44,12 +36,6 @@ export default function Header({
       onStart();
     }
   };
-
-  const actions = [
-    { icon: <SaveIcon />, name: "Save plan", onClick: onSave },
-    { icon: <FolderOpenIcon />, name: "Load plan", onClick: onLoad },
-    { icon: <LogoutIcon />, name: "Exit session", onClick: onClear, destructive: true },
-  ];
 
   const totalMinutes = Math.round((totalDuration || 0) / 60);
   const statusLabel = {
@@ -74,23 +60,38 @@ export default function Header({
           gap: 1,
         }}
       >
-        <div>
-          <Typography
-            variant="h6"
-            sx={{
-              fontSize: 18,
-              fontWeight: 600,
-              letterSpacing: 0.4,
-            }}
-          >
+        <div style={{ minWidth: 0, width: "100%" }}>
+          <Typography variant="h6" sx={{ fontSize: 18, fontWeight: 600, letterSpacing: 0.4 }}>
             Cadence<Box component="span" sx={{ color: "var(--accent)" }}>.</Box>
           </Typography>
-          <Typography
-            variant="body2"
-            sx={{ color: "var(--text-muted)", fontSize: 12 }}
+          <Button
+            onClick={onOpenLibrary}
+            aria-label={`Open class library. Current class: ${className || "none"}`}
+            endIcon={<ArrowDropDownIcon />}
+            sx={{
+              mt: 0.5,
+              maxWidth: "100%",
+              justifyContent: "space-between",
+              px: 1.5,
+              py: 0.25,
+              minHeight: 30,
+              borderRadius: "var(--radius-pill)",
+              border: "1px solid var(--border-subtle)",
+              color: "var(--text-primary)",
+              fontSize: 14,
+              fontWeight: 600,
+              backgroundColor: "var(--surface)",
+              "& .MuiButton-endIcon": { ml: 0.5, mr: -0.5 },
+              "&:hover": {
+                backgroundColor: "var(--elevated)",
+                borderColor: "var(--border-strong)",
+              },
+            }}
           >
-            Build your class
-          </Typography>
+            <Box component="span" sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {className || "Choose a class"}
+            </Box>
+          </Button>
           <Typography
             variant="body2"
             sx={{
@@ -189,57 +190,25 @@ export default function Header({
             Reset
           </Button>
 
-          <SpeedDial
-            ariaLabel="Planner actions"
-            icon={
-              <SpeedDialIcon
-                icon={<MenuIcon />}
-                openIcon={<CloseIcon />}
-              />
-            }
-            direction="left"
-            open={open}
-            onOpen={() => setOpen(true)}
-            onClose={() => setOpen(false)}
-            FabProps={{
-              size: "small",
-              sx: { ml: 0.5 },
+          <IconButton
+            aria-label="Exit session"
+            onClick={() => {
+              if (!window.confirm("Exit the current planner session?")) return;
+              onExit();
+            }}
+            size="small"
+            sx={{
+              ml: 0.5,
+              border: "1px solid var(--border-subtle)",
+              color: "var(--accent)",
+              "&:hover": {
+                borderColor: "var(--accent)",
+                backgroundColor: "var(--surface)",
+              },
             }}
           >
-            {actions.map((action) => (
-              <SpeedDialAction
-                key={action.name}
-                icon={action.icon}
-                aria-label={action.name}
-                FabProps={{
-                  size: "small",
-                  sx: {
-                    backgroundColor: "var(--surface)",
-                    color: action.destructive
-                      ? "var(--accent)"
-                      : "var(--text-secondary)",
-                    border: "1px solid var(--border-subtle)",
-                    "&:hover": {
-                      backgroundColor: "var(--elevated)",
-                      borderColor: action.destructive
-                        ? "var(--accent)"
-                        : "var(--border-subtle)",
-                    },
-                  },
-                }}
-                onClick={() => {
-                  if (
-                    action.destructive &&
-                    !window.confirm("Exit the current planner session?")
-                  ) {
-                    return;
-                  }
-                  action.onClick();
-                  setOpen(false);
-                }}
-              />
-            ))}
-          </SpeedDial>
+            <LogoutIcon fontSize="small" />
+          </IconButton>
         </Stack>
       </Toolbar>
     </AppBar>

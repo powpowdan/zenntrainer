@@ -1,13 +1,16 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Header from "./components/Header";
 import Timeline from "./components/Timeline";
 import AddTaskForm from "./components/AddTaskForm";
 import Notes from "./components/Notes";
 import LiveClass from "./components/LiveClass";
 import PlannerOverlay from "./components/PlannerOverlay";
+import LibraryModal from "./components/LibraryModal";
 import Login from "./Login";
 import { supabase } from "./supabaseClient";
 import { unlockAudio, playBell } from "./sound";
+import * as guestStore from "./classStorage";
+import { SAMPLE_CLASS_NAME, SAMPLE_TASKS } from "./samplePlan";
 
 const getDuration = (task) => Number(task.duration) || 0;
 
@@ -25,9 +28,71 @@ const getTaskFields = (task, position) => ({
 const createLocalTaskId = () =>
   `local-${crypto.randomUUID?.() || `${Date.now()}-${Math.random()}`}`;
 
+const mapClassRow = (row) => ({
+  id: row.id,
+  name: row.name,
+  createdAt: row.created_at,
+  updatedAt: row.updated_at,
+});
+
+const fetchClasses = async () => {
+  const { data, error } = await supabase
+    .from("classes")
+    .select("*")
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  return (data || []).map(mapClassRow);
+};
+
+const fetchRunsByClass = async () => {
+  const { data, error } = await supabase
+    .from("runs")
+    .select("class_id, finished_at")
+    .order("finished_at", { ascending: false });
+  if (error) throw error;
+  return guestStore.aggregateRuns(
+    (data || []).map((run) => ({
+      classId: run.class_id,
+      finishedAt: run.finished_at,
+    }))
+  );
+};
+
+const fetchTaskSummaries = async () => {
+  const { data, error } = await supabase
+    .from("tasks")
+    .select("class_id, duration");
+  if (error) throw error;
+  const summaries = {};
+  for (const row of data || []) {
+    const entry = summaries[row.class_id] || { blockCount: 0, totalMinutes: 0 };
+    entry.blockCount += 1;
+    entry.totalMinutes += getDuration(row);
+    summaries[row.class_id] = entry;
+  }
+  return summaries;
+};
+
+const guestTaskSummaries = (data) => {
+  const summaries = {};
+  for (const [classId, taskList] of Object.entries(data.tasksByClass)) {
+    summaries[classId] = {
+      blockCount: taskList.length,
+      totalMinutes: taskList.reduce((sum, task) => sum + getDuration(task), 0),
+    };
+  }
+  return summaries;
+};
+
 export default function App() {
   const [session, setSession] = useState(null);
   const [guestMode, setGuestMode] = useState(false);
+  const [classes, setClasses] = useState([]);
+  const [currentClassId, setCurrentClassId] = useState(null);
+  const [runsByClass, setRunsByClass] = useState({});
+  const [taskSummaries, setTaskSummaries] = useState({});
+  const [isLibraryOpen, setIsLibraryOpen] = useState(false);
+  const [isBootDone, setIsBootDone] = useState(false);
   const [isLiveMode, setIsLiveMode] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
   const [isComplete, setIsComplete] = useState(false);
@@ -43,6 +108,7 @@ export default function App() {
   );
   const [persistenceStatus, setPersistenceStatus] = useState("saved");
   const [persistenceError, setPersistenceError] = useState("");
+  const [tasks, setTasks] = useState([]);
   const transitionTimer = useRef(null);
   const previousActiveTaskId = useRef(null);
   const suppressTransition = useRef(false);
@@ -50,21 +116,9 @@ export default function App() {
   const persistenceQueue = useRef(Promise.resolve());
   const persistedIdMap = useRef(new Map());
   const planRevision = useRef(0);
-
-  const [tasks, setTasks] = useState(() => {
-    const saved = localStorage.getItem("savedClass");
-    return saved
-      ? normalizeTasks(JSON.parse(saved))
-      : normalizeTasks([
-          { id: 1, name: "Warmup", duration: 20, plan: "5-7 min skip ropes. run, pushups" },
-          { id: 2, name: "Stretch", duration: 10, plan: "7 point stretch, focus on shoulder more this class" },
-          { id: 3, name: "Technical", duration: 10, plan: "Phase 1: teep / jab/ cross, tiger step, jab / cross /knee \nPhase 2: jab/ cross, step aside, jab, body kick" },
-          { id: 4, name: "Cardio", duration: 10, plan: "run and then sprints on side and pushups" },
-          { id: 5, name: "Heavy bag", duration: 10, plan: "Same as technical, add low kick. " },
-          { id: 6, name: "Warmup2", duration: 8, plan: "Teep teep teep teep asdd" },
-          { id: 7, name: "Stretch2", duration: 10, plan: "heavy bag burnout kicks" },
-        ]);
-  });
+  const guestDataRef = useRef(null);
+  const runMetaRef = useRef(null);
+  const bootedKeyRef = useRef(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
@@ -81,12 +135,6 @@ export default function App() {
 
     return () => subscription.unsubscribe();
   }, []);
-
-  useEffect(() => {
-    if (session) {
-      fetchTasks();
-    }
-  }, [session]);
 
   const totalDuration = tasks.reduce(
     (sum, task) => sum + getDuration(task) * 60,
@@ -113,6 +161,8 @@ export default function App() {
 
   const activeTask = activeIndex >= 0 ? tasks[activeIndex] : null;
   const selectedTask = tasks.find((task) => task.id === selectedTaskId) || null;
+  const currentClass = classes.find((cls) => cls.id === currentClassId) || null;
+  const hasActiveRun = isLiveMode && !isComplete && elapsedTime > 0;
 
   useEffect(() => {
     if (!tasks.length) {
@@ -124,6 +174,277 @@ export default function App() {
       setSelectedTaskId(tasks[0].id);
     }
   }, [selectedTaskId, tasks]);
+
+  const clearRunState = () => {
+    setIsRunning(false);
+    setRunStartedAt(null);
+    setActiveTaskId(null);
+    setIsComplete(false);
+    setOffsetWithinBlock(0);
+    setBaseOffset(0);
+    setTransitionTask(null);
+    completionBellPlayed.current = false;
+    previousActiveTaskId.current = null;
+    runMetaRef.current = null;
+  };
+
+  // Reset class-library state when the app falls back to the login screen
+  // (sign out, guest exit, or token expiry) so the next session re-boots fresh.
+  useEffect(() => {
+    if (session || guestMode) return;
+    bootedKeyRef.current = null;
+    setIsBootDone(false);
+    setIsLibraryOpen(false);
+    setIsLiveMode(false);
+    setIsPlannerOverlayOpen(false);
+    setCurrentClassId(null);
+    setClasses([]);
+    setTasks([]);
+    setRunsByClass({});
+    setTaskSummaries({});
+    setPersistenceStatus("saved");
+    setPersistenceError("");
+    clearRunState();
+  }, [session, guestMode]);
+
+  const refreshRunsByClass = useCallback(async () => {
+    if (session) {
+      try {
+        setRunsByClass(await fetchRunsByClass());
+      } catch (error) {
+        console.error("Error fetching run history:", error);
+      }
+      return;
+    }
+    if (guestDataRef.current) {
+      setRunsByClass(guestStore.aggregateRuns(guestStore.getRuns(guestDataRef.current)));
+    }
+  }, [session]);
+
+  const refreshTaskSummaries = async () => {
+    if (session) {
+      try {
+        setTaskSummaries(await fetchTaskSummaries());
+      } catch (error) {
+        console.error("Error fetching class summaries:", error);
+      }
+      return;
+    }
+    if (guestDataRef.current) {
+      setTaskSummaries(guestTaskSummaries(guestDataRef.current));
+    }
+  };
+
+  const loadClassTasks = async (classId) => {
+    if (session) {
+      const { data, error } = await supabase
+        .from("tasks")
+        .select("*")
+        .eq("class_id", classId)
+        .order("position", { ascending: true })
+        .order("id", { ascending: true });
+      if (error) throw error;
+      return normalizeTasks(data || []);
+    }
+    return normalizeTasks(
+      guestStore.readTasks(guestDataRef.current, classId)
+    );
+  };
+
+  const rememberLastOpened = (classId) => {
+    if (session) {
+      guestStore.setUserLastClassId(classId);
+    } else if (guestDataRef.current) {
+      guestDataRef.current.lastOpenedClassId = classId;
+      guestStore.saveData(guestDataRef.current);
+    }
+  };
+
+  const openClass = async (classId, { skipRunConfirm = false } = {}) => {
+    if (classId === currentClassId) {
+      setIsLibraryOpen(false);
+      return;
+    }
+
+    if (!skipRunConfirm && hasActiveRun) {
+      const name = currentClass?.name || "current class";
+      if (
+        !window.confirm(
+          `Leave the run of "${name}"? The run will end and won't be recorded.`
+        )
+      ) {
+        return;
+      }
+    }
+
+    setIsLibraryOpen(false);
+    setIsPlannerOverlayOpen(false);
+    setIsLiveMode(false);
+    clearRunState();
+
+    // Let any in-flight writes for the previous class finish before swapping.
+    if (session) {
+      await persistenceQueue.current.catch(() => undefined);
+    }
+
+    persistedIdMap.current = new Map();
+    planRevision.current += 1;
+    setCurrentClassId(classId);
+    setPersistenceError("");
+
+    try {
+      setTasks(await loadClassTasks(classId));
+      setPersistenceStatus("saved");
+      rememberLastOpened(classId);
+    } catch (error) {
+      console.error("Error loading class:", error);
+      setTasks([]);
+      setPersistenceStatus("error");
+      setPersistenceError("Could not load the class.");
+    }
+  };
+
+  const createClassRecord = async (name, seedTasks = []) => {
+    if (session) {
+      const { data: classRow, error } = await supabase
+        .from("classes")
+        .insert({ user_id: session.user.id, name })
+        .select()
+        .single();
+      if (error) throw error;
+
+      if (seedTasks.length) {
+        const rows = seedTasks.map((task, index) => ({
+          ...getTaskFields(task, index),
+          class_id: classRow.id,
+          user_id: session.user.id,
+        }));
+        const { error: insertError } = await supabase.from("tasks").insert(rows);
+        if (insertError) throw insertError;
+      }
+
+      const mapped = mapClassRow(classRow);
+      setClasses((previous) => [...previous, mapped]);
+      return mapped;
+    }
+
+    const data = guestDataRef.current;
+    const created = guestStore.createClass(data, name, seedTasks);
+    setClasses(guestStore.getClassList(data));
+    return created;
+  };
+
+  // Boot: after login/guest choice, load the library, seed first-time coaches,
+  // and reopen the last-opened class (or a fallback).
+  useEffect(() => {
+    if (!session && !guestMode) return;
+
+    const bootKey = session ? `user:${session.user.id}` : "guest";
+    // Guard against StrictMode's double-invoked effects: only remember the
+    // boot once it finished uncancelled, so the second invocation still runs.
+    if (bootedKeyRef.current === bootKey) return;
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        let classList = [];
+
+        if (session) {
+          classList = await fetchClasses();
+          if (cancelled) return;
+          setClasses(classList);
+          try {
+            setRunsByClass(await fetchRunsByClass());
+          } catch (error) {
+            console.error("Error fetching run history:", error);
+          }
+        } else {
+          const data = guestStore.loadData();
+          guestStore.migrateLegacyPlan(data);
+          guestDataRef.current = data;
+          classList = guestStore.getClassList(data);
+          setClasses(classList);
+          setRunsByClass(guestStore.aggregateRuns(guestStore.getRuns(data)));
+        }
+
+        if (classList.length === 0) {
+          await createClassRecord(SAMPLE_CLASS_NAME, SAMPLE_TASKS);
+          if (cancelled) return;
+          classList = session ? await fetchClasses() : guestStore.getClassList(guestDataRef.current);
+          setClasses(classList);
+        }
+
+        const lastId = session
+          ? guestStore.getUserLastClassId()
+          : guestDataRef.current.lastOpenedClassId;
+        const target =
+          classList.find((cls) => cls.id === lastId) || classList[0];
+
+        if (!target) {
+          setIsLibraryOpen(true);
+          return;
+        }
+
+        await openClass(target.id, { skipRunConfirm: true });
+      } catch (error) {
+        console.error("Error loading classes:", error);
+        setPersistenceStatus("error");
+        setPersistenceError("Could not load your classes.");
+        setIsLibraryOpen(true);
+      } finally {
+        if (!cancelled) {
+          bootedKeyRef.current = bootKey;
+          setIsBootDone(true);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session, guestMode]);
+
+  // Records a completed run silently (no UI moment), hooked into the run
+  // clock's natural-completion branch. Plan-edit completion never reaches it.
+  const recordCompletedRun = useCallback(() => {
+    const meta = runMetaRef.current;
+    runMetaRef.current = null;
+    if (!meta || !currentClassId) return;
+
+    const finishedAt = new Date().toISOString();
+
+    if (session) {
+      supabase
+        .from("runs")
+        .insert({
+          class_id: currentClassId,
+          user_id: session.user.id,
+          started_at: meta.startedAt,
+          finished_at: finishedAt,
+          planned_minutes: meta.plannedMinutes,
+        })
+        .then(({ error }) => {
+          if (error) {
+            console.error("Error recording run:", error);
+            return;
+          }
+          refreshRunsByClass();
+        });
+      return;
+    }
+
+    if (guestDataRef.current) {
+      guestStore.addRun(guestDataRef.current, {
+        classId: currentClassId,
+        startedAt: meta.startedAt,
+        finishedAt: finishedAt,
+        plannedMinutes: meta.plannedMinutes,
+      });
+      refreshRunsByClass();
+    }
+  }, [session, currentClassId, refreshRunsByClass]);
 
   useEffect(() => {
     if (!isRunning || !runStartedAt || activeTaskId === null) return undefined;
@@ -148,6 +469,7 @@ export default function App() {
           if (!completionBellPlayed.current) {
             completionBellPlayed.current = true;
             playBell(isMuted);
+            recordCompletedRun();
           }
           return;
         }
@@ -170,8 +492,9 @@ export default function App() {
   }, [
     activeTaskId,
     baseOffset,
-    isRunning,
     isMuted,
+    isRunning,
+    recordCompletedRun,
     runStartedAt,
     tasks,
     totalDuration,
@@ -207,24 +530,6 @@ export default function App() {
     return () => window.clearTimeout(transitionTimer.current);
   }, [activeTaskId, isRunning, isMuted, tasks]);
 
-  const fetchTasks = async () => {
-    const { data, error } = await supabase
-      .from("tasks")
-      .select("*")
-      .order("position", { ascending: true })
-      .order("id", { ascending: true });
-    if (error) {
-      console.error("Error fetching tasks:", error);
-      setPersistenceStatus("error");
-      setPersistenceError("Could not load the saved plan.");
-      return;
-    }
-
-    setTasks(normalizeTasks(data || []));
-    setPersistenceStatus("saved");
-    setPersistenceError("");
-  };
-
   const enqueuePersistence = (operation) => {
     const nextOperation = persistenceQueue.current.then(operation, operation);
     persistenceQueue.current = nextOperation.catch(() => undefined);
@@ -244,11 +549,15 @@ export default function App() {
     const insertedTasks = nextTasks.filter((task) => !previousIds.has(task.id));
     const insertedById = new Map();
 
+    // New rows stage in the -2000000 range so they never collide with the
+    // -1000000 staging range used for surviving rows below: the partial
+    // unique(class_id, position) index rejects transient duplicates.
     for (const task of insertedTasks) {
       const { data, error } = await supabase
         .from("tasks")
         .insert({
-          ...getTaskFields(task, -1000000 - task.position),
+          ...getTaskFields(task, -2000000 - task.position),
+          class_id: currentClassId,
           user_id: session.user.id,
         })
         .select()
@@ -274,6 +583,7 @@ export default function App() {
             .from("tasks")
             .delete()
             .eq("id", task.id)
+            .eq("class_id", currentClassId)
             .eq("user_id", session.user.id);
           if (error) throw error;
         })
@@ -286,6 +596,7 @@ export default function App() {
           .from("tasks")
           .update({ position: -1000000 - index })
           .eq("id", task.id)
+          .eq("class_id", currentClassId)
           .eq("user_id", session.user.id);
         if (error) throw error;
       })
@@ -297,6 +608,7 @@ export default function App() {
           .from("tasks")
           .update(getTaskFields(task, index))
           .eq("id", task.id)
+          .eq("class_id", currentClassId)
           .eq("user_id", session.user.id);
         if (error) throw error;
       })
@@ -436,8 +748,25 @@ export default function App() {
       }
     }
 
-    if (!session) {
+    if (!currentClassId) {
       setPersistenceStatus("unsaved");
+      return Promise.resolve(normalizedTasks);
+    }
+
+    if (!session) {
+      try {
+        guestStore.writeTasks(
+          guestDataRef.current,
+          currentClassId,
+          normalizedTasks
+        );
+        setPersistenceStatus("saved");
+        refreshTaskSummaries();
+      } catch (error) {
+        console.error("Error saving class:", error);
+        setPersistenceStatus("error");
+        setPersistenceError("Could not save the class on this device.");
+      }
       return Promise.resolve(normalizedTasks);
     }
 
@@ -451,6 +780,7 @@ export default function App() {
         if (revision === planRevision.current) {
           setTasks(persistedTasks);
           setPersistenceStatus("saved");
+          refreshTaskSummaries();
         }
         return persistedTasks;
       } catch (error) {
@@ -471,9 +801,13 @@ export default function App() {
   };
 
   const addTask = (task) => {
+    if (!currentClassId) {
+      setIsLibraryOpen(true);
+      return;
+    }
     const taskWithId = {
       ...task,
-      id: session ? createLocalTaskId() : Date.now(),
+      id: createLocalTaskId(),
     };
     commitPlan([...tasks, taskWithId]);
   };
@@ -489,42 +823,165 @@ export default function App() {
     commitPlan(tasks.filter((item) => item.id !== id));
   };
 
-  const savePlan = () => {
-    if (session) {
-      commitPlan(tasks);
-      return;
-    }
-
-    localStorage.setItem("savedClass", JSON.stringify(normalizeTasks(tasks)));
-    setPersistenceStatus("saved");
-    setPersistenceError("");
-  };
-
-  const loadPlan = () => {
-    if (session) {
-      fetchTasks();
-      return;
-    }
-
-    const saved = localStorage.getItem("savedClass");
-    if (!saved) return;
-    setTasks(normalizeTasks(JSON.parse(saved)));
-    setPersistenceStatus("saved");
-    setPersistenceError("");
-  };
-
   const retryPersistence = () => {
     commitPlan(tasks);
   };
 
+  const handleCreateClass = async (name) => {
+    try {
+      const created = await createClassRecord(name);
+      await openClass(created.id);
+      refreshTaskSummaries();
+    } catch (error) {
+      console.error("Error creating class:", error);
+      setPersistenceStatus("error");
+      setPersistenceError("Could not create the class.");
+    }
+  };
+
+  const handleRenameClass = async (classId) => {
+    const cls = classes.find((item) => item.id === classId);
+    if (!cls) return;
+
+    const name = window.prompt("Rename class", cls.name);
+    if (name === null) return;
+    const trimmed = name.trim();
+    if (!trimmed || trimmed === cls.name) return;
+
+    try {
+      if (session) {
+        const { error } = await supabase
+          .from("classes")
+          .update({ name: trimmed })
+          .eq("id", classId)
+          .eq("user_id", session.user.id);
+        if (error) throw error;
+      } else {
+        guestStore.renameClass(guestDataRef.current, classId, trimmed);
+      }
+      setClasses((previous) =>
+        previous.map((item) =>
+          item.id === classId
+            ? { ...item, name: trimmed, updatedAt: new Date().toISOString() }
+            : item
+        )
+      );
+    } catch (error) {
+      console.error("Error renaming class:", error);
+      setPersistenceStatus("error");
+      setPersistenceError("Could not rename the class.");
+    }
+  };
+
+  const handleDuplicateClass = async (classId) => {
+    const cls = classes.find((item) => item.id === classId);
+    if (!cls) return;
+
+    try {
+      if (session) {
+        const { data: copyRow, error } = await supabase
+          .from("classes")
+          .insert({ user_id: session.user.id, name: `${cls.name} copy` })
+          .select()
+          .single();
+        if (error) throw error;
+
+        const { data: sourceTasks, error: fetchError } = await supabase
+          .from("tasks")
+          .select("name, duration, color, plan")
+          .eq("class_id", classId)
+          .order("position", { ascending: true })
+          .order("id", { ascending: true });
+        if (fetchError) throw fetchError;
+
+        if (sourceTasks && sourceTasks.length) {
+          const rows = sourceTasks.map((task, index) => ({
+            ...task,
+            position: index,
+            class_id: copyRow.id,
+            user_id: session.user.id,
+          }));
+          const { error: insertError } = await supabase.from("tasks").insert(rows);
+          if (insertError) throw insertError;
+        }
+
+        setClasses((previous) => [...previous, mapClassRow(copyRow)]);
+      } else {
+        guestStore.duplicateClass(guestDataRef.current, classId);
+        setClasses(guestStore.getClassList(guestDataRef.current));
+      }
+      refreshTaskSummaries();
+    } catch (error) {
+      console.error("Error duplicating class:", error);
+      setPersistenceStatus("error");
+      setPersistenceError("Could not duplicate the class.");
+    }
+  };
+
+  const handleDeleteClass = async (classId) => {
+    const cls = classes.find((item) => item.id === classId);
+    if (!cls) return;
+
+    if (
+      !window.confirm(
+        `Delete “${cls.name}”? Its blocks and run history will be deleted too.`
+      )
+    ) {
+      return;
+    }
+
+    try {
+      if (session) {
+        const { error } = await supabase
+          .from("classes")
+          .delete()
+          .eq("id", classId)
+          .eq("user_id", session.user.id);
+        if (error) throw error;
+      } else {
+        guestStore.deleteClass(guestDataRef.current, classId);
+      }
+
+      const nextClasses = session
+        ? classes.filter((item) => item.id !== classId)
+        : guestStore.getClassList(guestDataRef.current);
+      setClasses(nextClasses);
+      refreshRunsByClass();
+      refreshTaskSummaries();
+
+      if (classId === currentClassId) {
+        setIsPlannerOverlayOpen(false);
+        setIsLiveMode(false);
+        clearRunState();
+
+        const fallback = nextClasses[0];
+        if (fallback) {
+          await openClass(fallback.id, { skipRunConfirm: true });
+        } else {
+          setCurrentClassId(null);
+          setTasks([]);
+          setIsLibraryOpen(true);
+        }
+      }
+    } catch (error) {
+      console.error("Error deleting class:", error);
+      setPersistenceStatus("error");
+      setPersistenceError("Could not delete the class.");
+    }
+  };
+
   const startClass = () => {
-    if (!tasks.length || totalDuration <= 0) return;
+    if (!currentClassId || !tasks.length || totalDuration <= 0) return;
 
     let startTaskId;
     let startOffset;
     if (isComplete || activeTaskId === null) {
       startTaskId = tasks[0].id;
       startOffset = 0;
+      runMetaRef.current = {
+        startedAt: new Date().toISOString(),
+        plannedMinutes: Math.round(totalDuration / 60),
+      };
     } else {
       startTaskId = tasks.some((task) => task.id === activeTaskId)
         ? activeTaskId
@@ -576,6 +1033,7 @@ export default function App() {
     setTransitionTask(null);
     completionBellPlayed.current = false;
     previousActiveTaskId.current = tasks.length ? tasks[0].id : null;
+    runMetaRef.current = null;
   };
 
   const moveToBlock = (targetIndex) => {
@@ -608,6 +1066,7 @@ export default function App() {
     setIsLiveMode(false);
     setIsPlannerOverlayOpen(false);
     setTransitionTask(null);
+    runMetaRef.current = null;
   };
 
   const openPlannerOverlay = () => {
@@ -617,9 +1076,31 @@ export default function App() {
 
   const closePlannerOverlay = () => setIsPlannerOverlayOpen(false);
 
+  const exitSession = () => {
+    if (session) supabase.auth.signOut();
+    else setGuestMode(false);
+  };
+
   if (!session && !guestMode) {
     return <Login onGuest={() => setGuestMode(true)} />;
   }
+
+  const renderLibraryModal = () => (
+    <LibraryModal
+      open={isLibraryOpen || (isBootDone && !currentClassId)}
+      required={isBootDone && !currentClassId}
+      onClose={() => setIsLibraryOpen(false)}
+      classes={classes}
+      currentClassId={currentClassId}
+      runsByClass={runsByClass}
+      taskSummaries={taskSummaries}
+      onOpenClass={(classId) => openClass(classId)}
+      onCreateClass={handleCreateClass}
+      onRenameClass={handleRenameClass}
+      onDuplicateClass={handleDuplicateClass}
+      onDeleteClass={handleDeleteClass}
+    />
+  );
 
   const renderPlanner = () => (
     <>
@@ -628,20 +1109,17 @@ export default function App() {
         onPause={pauseClass}
         onResume={resumeClass}
         onReset={resetClass}
-        onSave={savePlan}
-        onLoad={loadPlan}
+        onExit={exitSession}
         onRetry={retryPersistence}
-        persistenceStatus={persistenceStatus}
-        persistenceError={persistenceError}
-        onClear={() => {
-          if (session) supabase.auth.signOut();
-          else setGuestMode(false);
-        }}
+        onOpenLibrary={() => setIsLibraryOpen(true)}
+        className={currentClass?.name}
         isRunning={isRunning}
         isLiveMode={isLiveMode}
         taskCount={tasks.length}
         totalDuration={totalDuration}
         canStart={tasks.length > 0 && totalDuration > 0}
+        persistenceStatus={persistenceStatus}
+        persistenceError={persistenceError}
       />
       <div className="builder-content">
         <div className="builder-timeline">
@@ -701,9 +1179,15 @@ export default function App() {
             {renderPlanner()}
           </PlannerOverlay>
         )}
+        {renderLibraryModal()}
       </div>
     );
   }
 
-  return <div className="app-shell">{renderPlanner()}</div>;
+  return (
+    <div className="app-shell">
+      {renderPlanner()}
+      {renderLibraryModal()}
+    </div>
+  );
 }
