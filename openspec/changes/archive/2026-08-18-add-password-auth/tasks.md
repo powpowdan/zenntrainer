@@ -2,8 +2,8 @@
 
 ## 1. Supabase configuration (manual, pre-deploy)
 
-- [ ] 1.1 In Supabase dashboard, disable Authentication → Sign In / Up → Email → "Confirm email"
-- [ ] 1.2 Verify Site URL / email redirect points at the deployed app so reset links land correctly
+- [x] 1.1 In Supabase dashboard, disable Authentication → Sign In / Up → Email → "Confirm email"
+- [x] 1.2 Verify Site URL / email redirect points at the deployed app so reset links land correctly
 
 ## 2. Auth UI
 
@@ -21,8 +21,8 @@
 
 ## 4. Verification
 
-- [ ] 4.1 Sign up with a new email: session established immediately, zero emails sent, username stored in `user_metadata`
-- [ ] 4.2 Sign out and sign in with the new credentials; wrong password shows inline error without revealing email existence
-- [ ] 4.3 Forgot password for an existing (magic-link) account: reset email arrives, link opens the app on the set-password screen, new password persists, sign-in works with it
-- [ ] 4.4 Guest mode still works end-to-end (local storage, no session)
+- [x] 4.1 Sign up with a new email: session established immediately, zero emails sent, username stored in `user_metadata`
+- [x] 4.2 Sign out and sign in with the new credentials; wrong password shows inline error without revealing email existence
+- [x] 4.3 Forgot password for an existing (magic-link) account: reset email arrives, link opens the app on the set-password screen, new password persists, sign-in works with it
+- [x] 4.4 Guest mode still works end-to-end (local storage, no session)
 - [x] 4.5 Run `npm run lint` and fix any issues
