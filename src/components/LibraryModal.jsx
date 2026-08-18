@@ -15,6 +15,7 @@ import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import CloseIcon from "@mui/icons-material/Close";
+import IosShareIcon from "@mui/icons-material/IosShare";
 
 const formatDate = (isoString) => {
   try {
@@ -55,6 +56,7 @@ export default function LibraryModal({
   onRenameClass,
   onDuplicateClass,
   onDeleteClass,
+  onShareClass,
 }) {
   const [newClassName, setNewClassName] = useState("");
 
@@ -139,6 +141,14 @@ export default function LibraryModal({
                     </Box>
                   </Button>
                   <Stack spacing={0.5} justifyContent="center">
+                    <IconButton
+                      aria-label={`Share class ${cls.name}`}
+                      size="small"
+                      sx={actionSx}
+                      onClick={() => onShareClass(cls.id)}
+                    >
+                      <IosShareIcon fontSize="small" />
+                    </IconButton>
                     <IconButton
                       aria-label={`Duplicate class ${cls.name}`}
                       size="small"

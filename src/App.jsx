@@ -6,11 +6,17 @@ import Notes from "./components/Notes";
 import LiveClass from "./components/LiveClass";
 import PlannerOverlay from "./components/PlannerOverlay";
 import LibraryModal from "./components/LibraryModal";
+import ShareDialog from "./components/ShareDialog";
+import ImportDialog from "./components/ImportDialog";
 import Login from "./Login";
 import { supabase } from "./supabaseClient";
 import { unlockAudio, playBell } from "./sound";
 import * as guestStore from "./classStorage";
+import { publishSharedClass, fetchSharedClass } from "./classSharing";
+import { parseSnapshot } from "./classCodec";
 import { SAMPLE_CLASS_NAME, SAMPLE_TASKS } from "./samplePlan";
+
+const PENDING_SHARE_KEY = "cadencePendingShare";
 
 const getDuration = (task) => Number(task.duration) || 0;
 
@@ -109,6 +115,10 @@ export default function App() {
   const [persistenceStatus, setPersistenceStatus] = useState("saved");
   const [persistenceError, setPersistenceError] = useState("");
   const [tasks, setTasks] = useState([]);
+  const [shareState, setShareState] = useState(null);
+  const [pendingShareToken, setPendingShareToken] = useState(null);
+  const [importState, setImportState] = useState(null);
+  const [importAttempt, setImportAttempt] = useState(0);
   const transitionTimer = useRef(null);
   const previousActiveTaskId = useRef(null);
   const suppressTransition = useRef(false);
@@ -119,6 +129,22 @@ export default function App() {
   const guestDataRef = useRef(null);
   const runMetaRef = useRef(null);
   const bootedKeyRef = useRef(null);
+  const importedShareTokenRef = useRef(null);
+
+  // Capture a share token from ?s= at first load, strip it from the URL so a
+  // refresh never re-opens the import, and stash it for the magic-link
+  // round trip (which reloads the page without the param).
+  useEffect(() => {
+    const fromUrl = new URLSearchParams(window.location.search).get("s");
+    if (fromUrl) {
+      window.history.replaceState({}, "", window.location.pathname);
+      sessionStorage.setItem(PENDING_SHARE_KEY, fromUrl);
+      setPendingShareToken(fromUrl);
+      return;
+    }
+    const stashed = sessionStorage.getItem(PENDING_SHARE_KEY);
+    if (stashed) setPendingShareToken(stashed);
+  }, []);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
@@ -918,6 +944,117 @@ export default function App() {
     }
   };
 
+  const handleShareClass = async (classId) => {
+    const cls = classes.find((item) => item.id === classId);
+    if (!cls) return;
+
+    setShareState({ status: "working", className: cls.name });
+    try {
+      let sourceTasks;
+      if (session) {
+        const { data, error } = await supabase
+          .from("tasks")
+          .select("name, duration, color, plan")
+          .eq("class_id", classId)
+          .order("position", { ascending: true })
+          .order("id", { ascending: true });
+        if (error) throw error;
+        sourceTasks = data || [];
+      } else {
+        sourceTasks = guestStore.readTasks(guestDataRef.current, classId);
+      }
+
+      const { link } = await publishSharedClass(cls.name, sourceTasks);
+      setShareState({ status: "ready", className: cls.name, link });
+    } catch (error) {
+      if (error?.code === "share-oversize") {
+        setShareState({
+          status: "error",
+          className: cls.name,
+          classId,
+          message:
+            "This class is too large to share. Try shortening the notes on some blocks.",
+        });
+      } else {
+        console.error("Error sharing class:", error);
+        setShareState({
+          status: "error",
+          className: cls.name,
+          classId,
+          message:
+            "Could not create the share link. Check your connection and try again.",
+        });
+      }
+    }
+  };
+
+  const clearPendingShare = () => {
+    sessionStorage.removeItem(PENDING_SHARE_KEY);
+    setPendingShareToken(null);
+    setImportState(null);
+  };
+
+  const retryImport = () => {
+    importedShareTokenRef.current = null;
+    setImportState(null);
+    setImportAttempt((attempt) => attempt + 1);
+  };
+
+  const handleImportSharedClass = async () => {
+    if (importState?.status !== "ready" || !importState.snapshot) return;
+    const { name, blocks } = importState.snapshot;
+
+    setImportState((previous) => ({ ...previous, status: "importing", importFailed: false }));
+    try {
+      const created = await createClassRecord(name, blocks);
+      await openClass(created.id, { skipRunConfirm: true });
+      refreshTaskSummaries();
+      clearPendingShare();
+    } catch (error) {
+      console.error("Error importing shared class:", error);
+      setImportState((previous) => ({ ...previous, status: "ready", importFailed: true }));
+    }
+  };
+
+  // Once the library is reachable, resolve a pending share token into either
+  // an import preview or the friendly "no longer available" explanation.
+  // Invalid and expired tokens look identical here: the select policy hides
+  // expired rows, so both come back as no row.
+  useEffect(() => {
+    if (!isBootDone || !pendingShareToken) return;
+    if (importedShareTokenRef.current === pendingShareToken) return;
+
+    let cancelled = false;
+    (async () => {
+      setImportState({ status: "loading" });
+      let payload;
+      try {
+        payload = await fetchSharedClass(pendingShareToken);
+      } catch (error) {
+        if (cancelled) return;
+        importedShareTokenRef.current = pendingShareToken;
+        console.error("Error loading shared class:", error);
+        setImportState({ status: "error" });
+        return;
+      }
+      if (cancelled) return;
+      importedShareTokenRef.current = pendingShareToken;
+      if (!payload) {
+        setImportState({ status: "unavailable" });
+        return;
+      }
+      try {
+        setImportState({ status: "ready", snapshot: parseSnapshot(payload) });
+      } catch {
+        setImportState({ status: "unavailable" });
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isBootDone, pendingShareToken, importAttempt]);
+
   const handleDeleteClass = async (classId) => {
     const cls = classes.find((item) => item.id === classId);
     if (!cls) return;
@@ -1099,7 +1236,24 @@ export default function App() {
       onRenameClass={handleRenameClass}
       onDuplicateClass={handleDuplicateClass}
       onDeleteClass={handleDeleteClass}
+      onShareClass={handleShareClass}
     />
+  );
+
+  const renderShareDialogs = () => (
+    <>
+      <ShareDialog
+        state={shareState}
+        onClose={() => setShareState(null)}
+        onRetry={handleShareClass}
+      />
+      <ImportDialog
+        state={importState}
+        onImport={handleImportSharedClass}
+        onRetry={retryImport}
+        onClose={clearPendingShare}
+      />
+    </>
   );
 
   const renderPlanner = () => (
@@ -1180,6 +1334,7 @@ export default function App() {
           </PlannerOverlay>
         )}
         {renderLibraryModal()}
+        {renderShareDialogs()}
       </div>
     );
   }
@@ -1188,6 +1343,7 @@ export default function App() {
     <div className="app-shell">
       {renderPlanner()}
       {renderLibraryModal()}
+      {renderShareDialogs()}
     </div>
   );
 }
