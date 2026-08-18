@@ -24,5 +24,5 @@
 
 ## 5. Verification
 
-- [ ] 5.1 End-to-end on two devices/browsers as guests: share from one, open link on the other, import, run the imported class; confirm sender edits after sharing don't propagate
+- [x] 5.1 End-to-end on two devices/browsers as guests: share from one, open link on the other, import, run the imported class; confirm sender edits after sharing don't propagate
 - [x] 5.2 Verify link handling edge cases: expired token (insert with short expiry), invalid token, dismissed preview not re-shown on refresh, `npm run lint` and `npm run build` pass
