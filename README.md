@@ -36,7 +36,7 @@ plans to your own account across devices.
 **Live class mode**
 - Focused, phone-first run view.
 - Independent countdowns for the active block and the remaining whole class.
-- Automatic advance to the next block at zero, with a brief non-blocking "up next" transition.
+- Automatic advance to the next block at zero, with a brief non-blocking "up next" transition and a natural-transition bell.
 - Manual previous / next controls, plus pause, resume, and reset.
 - Completion screen with a clear "class finished" state.
 
@@ -47,9 +47,20 @@ plans to your own account across devices.
 - Destructive run-time edits (deleting the active or a passed block, shortening the active block below elapsed time, reordering the active or passed blocks) require explicit confirmation that names the consequence.
 
 **Persistence**
-- Sign in with a magic link to save plans per user with stable, restorable ordering.
+- Sign up / sign in with email and password (no confirmation emails), with a forgot-password reset flow.
+- Signed-in plans are saved per user to Supabase with stable, restorable ordering.
 - Continue as guest to keep plans in `localStorage`.
 - Persistent saved / saving / unsaved / error status indicator with a retry path on failure — failed saves never silently discard your visible edits.
+
+**Class library**
+- Keep a personal library of named classes instead of a single implicit plan.
+- Switch between classes, create new ones, and duplicate existing ones.
+- See when each class was last taught.
+
+**Sharing**
+- Hand any class to another coach as a share link — no account required on either end, so guests can share too.
+- The recipient opens the link and adds the class to their own library as an independent copy; later edits on either side don't propagate.
+- Snapshots are size-capped and links expire automatically (up to 31 days).
 
 **Accessibility & theming**
 - Keyboard-navigable selection and editing, managed dialog focus, and touch-friendly targets.
@@ -62,7 +73,7 @@ plans to your own account across devices.
 - [React 19](https://react.dev) + [Vite 7](https://vite.dev)
 - [Material UI 7](https://mui.com) + Emotion
 - [@hello-pangea/dnd](https://github.com/hello-pangea/dnd) for drag-and-drop
-- [Supabase](https://supabase.com) for auth (magic link) and the `tasks` table
+- [Supabase](https://supabase.com) for auth (email + password) and the `classes`, `runs`, and `shared_classes` tables
 
 ---
 
@@ -90,8 +101,10 @@ VITE_SUPABASE_URL=your-supabase-project-url
 VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY=your-supabase-anon-key
 ```
 
-These map to the client created in `src/supabaseClient.js`. You'll need a
-Supabase project with a `tasks` table for authenticated saving.
+These map to the client created in `src/supabaseClient.js`. Create a Supabase
+project and apply each `.sql` file in `supabase/migrations/` in order via the
+SQL editor to get the tables, row-level security policies, and triggers
+authenticated saving and sharing need.
 
 > Want to try it without Supabase? Skip the `.env`, open the app, and choose
 > **Continue as guest** — plans persist to `localStorage` instead.
@@ -126,7 +139,14 @@ src/
 ├─ main.jsx                # React root + MUI ThemeProvider/CssBaseline
 ├─ theme.js                # Single source of truth for design tokens
 ├─ supabaseClient.js       # Supabase client from env vars
-├─ Login.jsx               # Magic-link login + guest entry
+├─ Login.jsx               # Email/password login + guest entry
+├─ SetPassword.jsx         # Set a new password from a reset link
+├─ classStorage.js         # Supabase-backed class persistence (classes/runs)
+├─ classSharing.js         # Share-link upload/fetch (shared_classes)
+├─ classCodec.js           # Encode/decode classes to versioned JSON snapshots
+├─ samplePlan.js           # Starter plan for new users
+├─ sound.js                # Transition bell playback
+├─ beep.mp3                # Bell sound asset
 ├─ index.css / App.css     # Global styles
 └─ components/
    ├─ Header.jsx           # Top bar: start/pause/reset, save/load, status
@@ -135,7 +155,10 @@ src/
    ├─ Notes.jsx            # Selected-block editor (name/duration/notes)
    ├─ AddTaskForm.jsx      # Add-block sheet
    ├─ LiveClass.jsx        # Phone-first live run view
-   └─ PlannerOverlay.jsx   # Mid-run planner overlay (drawer / fullscreen)
+   ├─ PlannerOverlay.jsx   # Mid-run planner overlay (drawer / fullscreen)
+   ├─ LibraryModal.jsx     # Class library: switch, create, duplicate
+   ├─ ShareDialog.jsx      # Create a share link for the current class
+   └─ ImportDialog.jsx     # Add a shared class from a link
 ```
 
 ---
@@ -150,3 +173,6 @@ src/
 3. **Adjust mid-run** — Open **Edit plan** to tweak notes or structure without
    stopping the clock. Only edits that affect the run position prompt for
    confirmation; everything else applies immediately.
+4. **Save & share** — Save classes to your library and revisit or duplicate
+   them later. Hand any class to another coach as a link; they add it to
+   their own library as an independent copy.
