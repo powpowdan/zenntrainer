@@ -1,5 +1,5 @@
 # Cadence
-
+test server ssh
 Phone-first class planner and live-run timer for coaches. Build an ordered
 session out of timed blocks (warmup, technique, bag work, conditioning, etc.),
 attach coaching notes to each block, then run the whole thing live with
